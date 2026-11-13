@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "WhatSave",
   "description": "Exporte em massa mídias, legendas reais, respostas diretas e links do WhatsApp Web, na ordem cronológica da conversa.",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "author": "Ruda Gabriel",
   "homepage_url": "https://github.com/RudaGabriel/WhatSave",
   "icons": {

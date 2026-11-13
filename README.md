@@ -1,6 +1,6 @@
 # WhatSave
 
-![Versão](https://img.shields.io/badge/vers%C3%A3o-1.4.0-e8a33d)
+![Versão](https://img.shields.io/badge/vers%C3%A3o-1.4.1-e8a33d)
 ![Testes](https://img.shields.io/badge/testes-53%20aprovados-2ea043)
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4)
 ![Chrome](https://img.shields.io/badge/Chrome-compat%C3%ADvel-4285F4?logo=googlechrome&logoColor=white)
