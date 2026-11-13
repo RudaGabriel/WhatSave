@@ -1,20 +1,19 @@
+# Arquivos do sistema operacional
 .DS_Store
 Thumbs.db
+
+# Registros
 *.log
 
-# Local tooling state
-.freebuff/
-
-# Earlier build of the extension, kept locally for reference only
-already-existing-one/
-
-# Packaged builds
+# Pacotes gerados para distribuição
 *.zip
 
-# Design audit output
-.slop-artifacts/
-
-# Store listing assets. The raw captures show real chat names and group ids,
-# so nothing in here belongs in a public repository.
+# Capturas de tela de conversas reais (podem conter nomes e números) nunca vão
+# para o repositório público.
 screenshots/
-.shot-src.html
+
+# Capturas geradas pelos testes de navegador
+testes/navegador/captura-*.png
+
+# Dependências locais (Playwright opcional)
+node_modules/

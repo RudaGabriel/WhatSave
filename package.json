@@ -1,0 +1,24 @@
+{
+  "name": "whatsave",
+  "version": "1.4.0",
+  "description": "Extensão de navegador para exportar em massa mídias, legendas e links do WhatsApp Web, na ordem cronológica da conversa.",
+  "private": true,
+  "license": "MIT",
+  "author": "Ruda Gabriel",
+  "contributors": [
+    "Jstarzz (autor original)"
+  ],
+  "homepage": "https://github.com/RudaGabriel/WhatSave",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RudaGabriel/WhatSave.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node testes/verificar-sintaxe.mjs && node testes/executar.mjs",
+    "test:navegador": "node testes/navegador/popup.mjs",
+    "verificar": "node testes/verificar-sintaxe.mjs"
+  }
+}

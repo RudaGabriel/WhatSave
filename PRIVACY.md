@@ -1,34 +1,47 @@
-# Privacy Policy for WhatSave
+# Política de privacidade — WhatSave
 
-WhatSave does not collect, store, transmit, or sell any data.
+O WhatSave não coleta, não armazena em servidores, não transmite e não vende
+nenhum dado.
 
-## What the extension does
+## O que a extensão faz
 
-WhatSave runs only on web.whatsapp.com, inside your own already logged in
-WhatsApp Web session. When you choose a chat and click download, it reads
-message and media data that WhatsApp Web itself already loaded into your
-browser for that chat, and saves the media files to your own computer using
-the browser's built in downloads feature.
+O WhatSave funciona somente em `web.whatsapp.com`, dentro da sua própria sessão
+do WhatsApp Web. Quando você escolhe uma conversa e inicia a exportação, a
+extensão lê as mensagens e mídias que o próprio WhatsApp Web já carregou no seu
+navegador e salva os arquivos no seu computador, usando o recurso de downloads
+do navegador.
 
-## What the extension does not do
+## O que a extensão não faz
 
-- It does not send any data to any server, developer, or third party.
-- It does not use analytics, telemetry, or tracking of any kind.
-- It does not read or touch any website other than web.whatsapp.com.
-- It does not store your messages or media anywhere except the files it
-  saves directly to your own Downloads folder.
+- Não envia dados a nenhum servidor, desenvolvedor ou terceiro.
+- Não usa análise de uso, telemetria nem rastreamento de qualquer tipo.
+- Não lê nem altera nenhum site além de `web.whatsapp.com`.
+- Não envia, apaga nem altera mensagens: apenas lê o que já está carregado.
+- Não guarda mensagens ou mídias em nenhum lugar além dos arquivos que você
+  mesmo exporta para a pasta Downloads.
 
-## Permissions
+## Legendas e links
 
-- `downloads`: used to save the files you choose to download.
-- `activeTab` and `scripting`: used to run the extension's logic on the
-  WhatsApp Web tab you have open.
-- Host permission for `web.whatsapp.com`: the extension only ever runs on
-  this site.
+O texto das legendas é usado apenas para montar o nome dos arquivos exportados.
+Os links são gravados somente nos arquivos `.txt` que você escolhe exportar.
+Nada disso é transmitido a serviços externos.
 
-## Contact
+## Preferências
 
-Questions can be raised as an issue on the GitHub repository:
-https://github.com/Jstarzz/whatsave
+As opções escolhidas no popup ficam salvas apenas no armazenamento local do
+navegador, no seu computador.
 
-Last updated: August 2026.
+## Permissões
+
+- `downloads`: salvar os arquivos que você escolhe exportar.
+- `activeTab` e `scripting`: executar a lógica da extensão na aba do WhatsApp Web.
+- Permissão de acesso a `web.whatsapp.com`: a extensão funciona somente nesse site.
+
+## Contato
+
+Dúvidas podem ser registradas como *issue* no repositório:
+https://github.com/RudaGabriel/WhatSave
+
+Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
+
+Última atualização: novembro de 2026.

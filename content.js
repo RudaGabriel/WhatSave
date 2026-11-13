@@ -1,21 +1,28 @@
-// content.js: thin bridge between the WhatsApp Web page (MAIN world script,
-// inpage/app.js) and the extension (popup.js / background.js).
+// WhatSave — content.js
+// Versão 1.4.0 (2026-11-13): textos e comentários em português do Brasil.
+// Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
+// Histórico completo das versões: CHANGELOG.md no repositório.
+//
+// Ponte leve entre a página do WhatsApp Web (script no MAIN world,
+// inpage/app.js) e a extensão (popup.js e background.js).
 (function () {
-  // The manifest registers this script and popup.js also injects it when a
-  // ping goes unanswered, so the same isolated world can receive it more than
-  // once. Without this guard each injection adds another pair of listeners,
-  // and every popup command then reaches the page once per listener, running
-  // whole downloads two or three times over concurrently.
+  // O manifesto registra este script e o popup.js também o injeta quando um
+  // ping fica sem resposta; assim, o mesmo contexto isolado pode recebê-lo mais
+  // de uma vez. Sem esta proteção, cada injeção acrescentaria outro par de
+  // ouvintes, e cada comando do popup chegaria à página repetido, executando
+  // exportações inteiras duas ou três vezes ao mesmo tempo.
   if (window.__WAMD_CONTENT_LOADED__) return;
   window.__WAMD_CONTENT_LOADED__ = true;
 
-  // Page -> extension (background or popup).
+  // Página -> extensão (background ou popup).
   window.addEventListener('message', (ev) => {
+    // Só aceita mensagens da própria janela (nunca de iframes de terceiros).
+    if (ev.source !== window) return;
     const { data } = ev;
     if (!data || data.__from !== 'wamd:inpage') return;
 
-    // Downloads need an ACK routed back to the page so app.js knows whether
-    // chrome.downloads.download() succeeded.
+    // Downloads precisam de uma confirmação de volta para a página, para que o
+    // app.js saiba se chrome.downloads.download() funcionou.
     if (data.type === 'wa:download') {
       try {
         chrome.runtime.sendMessage(
@@ -26,7 +33,7 @@
                 __from: 'wamd:content',
                 type: 'wa:download:ack',
                 id: data.id,
-                res: res || { ok: false, error: chrome.runtime.lastError?.message || 'no response' }
+                res: res || { ok: false, error: chrome.runtime.lastError?.message || 'sem resposta da extensão' }
               }, '*');
             } catch {}
           }
@@ -39,21 +46,21 @@
           res: { ok: false, error: String(e) }
         }, '*');
       }
-      return; // don't also forward this as a generic message
+      return; // Não encaminha também como mensagem genérica.
     }
 
-    // Generic forwarding (logs, progress updates, command responses, etc.)
+    // Encaminhamento genérico (registros, progresso, respostas de comandos etc.).
     try {
       chrome.runtime.sendMessage({ __from: 'wamd:content', payload: data });
     } catch {}
   });
 
-  // Popup -> page.
+  // Popup -> página.
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (!msg || msg.__to !== 'wamd:content') return;
 
-    // Lightweight ping used by the popup to check whether this content
-    // script is alive before sending real commands.
+    // Ping leve usado pelo popup para verificar se este script está ativo
+    // antes de enviar os comandos reais.
     if (msg.payload && msg.payload.type === 'ping') {
       sendResponse({ ok: true, pong: true });
       return;
