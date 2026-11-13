@@ -1,5 +1,5 @@
 // WhatSave — inpage/app.js
-// Versão 1.4.1 (2026-11-13): APP_VERSION atualizada para 1.4.1.
+// Versão 1.4.2 (2026-11-13): mensagens do registro de atividade resumidas.
 // Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
 // Histórico completo das versões: CHANGELOG.md no repositório.
 //
@@ -11,7 +11,7 @@
   // Atualizada sempre que o formato das mensagens popup <-> página muda. O popup
   // compara este valor com o seu; assim, uma aba aberta antes de uma atualização
   // da extensão não continua usando um app.js antigo com um popup novo.
-  const APP_VERSION = '1.4.1';
+  const APP_VERSION = '1.4.2';
 
   // Evita a injeção dupla do script.
   if (window.__WAMD_APP_LOADED__) {
@@ -1307,7 +1307,7 @@
         media.__wamdCaptionSource = 'reply';
         media.__wamdCaptionMessageId = replyId;
         usedCaptionMessageIds.add(replyId);
-        log(`Legenda associada por resposta direta exata -> ${msgSerializedId(media)}`);
+        log(`Legenda por resposta: ${msgSerializedId(media)}`);
       }
     }
 
@@ -1336,7 +1336,7 @@
         media.__wamdCaptionSource = 'standalone-next';
         media.__wamdCaptionMessageId = nextId;
         usedCaptionMessageIds.add(nextId);
-        log(`Legenda associada pela mensagem imediatamente seguinte -> ${msgSerializedId(media)}`);
+        log(`Legenda pela mensagem seguinte: ${msgSerializedId(media)}`);
       }
     }
   }
@@ -1358,7 +1358,7 @@
     let sameAnchorRepeats = 0;
     let didOpenChat = false;
 
-    log(`Analisando a conversa "${chatId}" (tipos: ${[...wanted].join(', ') || 'todos'})…`);
+    log(`Analisando a conversa…`);
 
     const msgId = (m) => {
       if (typeof m === 'string') return m;
@@ -1415,10 +1415,10 @@
             seenIds.clear();
             noNewRepeats = 0;
             sameAnchorRepeats = 0;
-            log('A conversa ainda não estava inicializada; ela foi aberta e a análise foi reiniciada.');
+            log('Conversa aberta; análise reiniciada.');
             continue;
           } catch (e) {
-            log('Falha ao abrir a conversa durante a análise: ' + (e?.message || e));
+            log('Falha ao abrir a conversa: ' + (e?.message || e));
           }
         }
       }
@@ -1527,7 +1527,6 @@
       return !(wanted.size && !wanted.has(norm) && !(wanted.has('ptt') && kind === 'ptt'));
     });
 
-    log(`Ordem cronológica definida antes das legendas e dos downloads: ${mediaMessages.length} mídia(s).`);
 
     if (captureNextMessageCaption || captureReplyCaption) {
       attachRecoveredCaptions(mediaMessages, orderedContext, from, to, {
@@ -1562,8 +1561,8 @@
     });
 
     const recovered = mediaMessages.filter(m => !!m.__wamdCaption).length;
-    if (recovered) log(`${recovered} legenda(s) recuperada(s) da própria mídia, de respostas diretas ou da mensagem seguinte.`);
-    log(`Análise concluída: ${exportItems.length} item(ns) para exportar (${mediaMessages.length} mídia(s) e ${linkMessages.length} link(s)).`);
+    if (recovered) log(`${recovered} legenda(s) recuperada(s).`);
+    log(`${mediaMessages.length} mídia(s) e ${linkMessages.length} link(s) para exportar.`);
     return exportItems;
   }
 
@@ -1752,7 +1751,7 @@
         return blob;
       } catch (e) {
         if (attempt > retries) {
-          log(`Ignorado: id=${mid}, tipo=${kind} -> ${e?.message || e}`);
+          log(`Ignorado (${kind}): ${e?.message || e}`);
         }
         if (attempt <= retries) await new Promise(r => setTimeout(r, 400));
       }
@@ -1990,7 +1989,7 @@
         if (i >= lista.length) return;
         let resultado = null;
         try { resultado = await preparar(lista[i], i); }
-        catch (e) { registrar(`Erro no item nº ${i + 1}: ${e?.message || e}`); }
+        catch (e) { registrar(`Erro no item ${i + 1}: ${e?.message || e}`); }
         prontos.set(i, resultado);
         avisar();
       }
@@ -2003,7 +2002,7 @@
         prontos.delete(proximoConsumir);
         const i = proximoConsumir++;
         try { await consumir(resultado, i); }
-        catch (e) { registrar(`Erro ao salvar o item nº ${i + 1}: ${e?.message || e}`); }
+        catch (e) { registrar(`Erro ao salvar o item ${i + 1}: ${e?.message || e}`); }
         avisar();
       }
     };
@@ -2033,7 +2032,7 @@
     });
 
     if (!msgs.length) {
-      log('Nenhuma mídia ou link encontrado com os filtros selecionados.');
+      log('Nada encontrado com esses filtros.');
       return { count: 0 };
     }
 
@@ -2041,10 +2040,9 @@
     // quando solicitado, também nos salvamentos.
     const preserveChatOrder = pack?.preserveChatOrder !== false;
     if (preserveChatOrder) {
-      log('Ordem do chat preservada: os arquivos serão numerados do mais antigo para o mais recente e salvos nessa mesma ordem.');
     }
 
-    log(`${msgs.length} item(ns) encontrado(s). Buscando até ${concurrency} por vez…`);
+    log(`Baixando ${msgs.length} item(ns)…`);
 
     const chatName = chatsFriendlyMap.get(chatId) || 'Chat';
     const chatFolder = sanitizeFilename(chatName) || 'Chat';
@@ -2102,10 +2100,10 @@
           const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
           result = { filename, mime: 'text/plain;charset=utf-8', arrayBuffer, bytes };
         } catch (e) {
-          log(`Erro no item nº ${index}: link ${mid}, ${e?.message || e}`);
+          log(`Erro no item ${index}: ${e?.message || e}`);
         }
       } else if (isProbablyUnavailableByMessage(m)) {
-        log(`Item nº ${index} ignorado: ${mid} (${kind}), mídia não disponível por completo`);
+        log(`Item ${index} ignorado: mídia indisponível.`);
       } else {
         try {
           const blob = await safeDownloadBlob(m, { timeoutMs: getTimeoutForMedia(m), retries: 1 });
@@ -2122,7 +2120,7 @@
             result = { filename, mime, arrayBuffer, bytes: new Uint8Array(arrayBuffer) };
           }
         } catch (e) {
-          log(`Erro no item nº ${index}: ${mid}, ${e?.message || e}`);
+          log(`Erro no item ${index}: ${e?.message || e}`);
         }
       }
 
@@ -2139,7 +2137,7 @@
     const salvarIndividual = async (entry) => {
       const tamanho = entry.arrayBuffer?.byteLength || 0;
       if (tamanho > LIMITE_PONTE_BYTES) {
-        log(`Arquivo grande (${formatarTamanho(tamanho)}): salvando diretamente pela página, na pasta Downloads. ${entry.filename}`);
+        log(`Arquivo grande (${formatarTamanho(tamanho)}) salvo na pasta Downloads: ${entry.filename}`);
         const res = saveBlobFromPage(new Blob([entry.arrayBuffer], { type: entry.mime || 'application/octet-stream' }), `${chatFolder}_${entry.filename}`);
         if (!res.ok) log(`Falha ao salvar: ${entry.filename}, ${res.error}`);
         return res.ok;
@@ -2162,7 +2160,7 @@
         numeroParte++;
         const sufixo = (ultima && numeroParte === 1) ? '' : `_parte${String(numeroParte).padStart(2, '0')}`;
         const zipName = `${chatFolder}_WhatSave${sufixo}.zip`;
-        log(`Montando ${zipName} com ${parte.length} arquivo(s) (${formatarTamanho(bytesParte)})…`);
+        log(`Gerando ${zipName} (${formatarTamanho(bytesParte)})…`);
         const blob = makeZip(parte);
         const res = saveBlobFromPage(blob, zipName);
         if (res.ok) itensNoZip += parte.length;
@@ -2183,11 +2181,11 @@
       await fecharParte(true);
 
       if (!numeroParte) {
-        log('Nenhum arquivo para compactar: nenhum item pôde ser baixado.');
+        log('Nenhum item pôde ser baixado.');
         return { count: 0, zip: true };
       }
       saved = itensNoZip;
-      log(`Concluído: ${saved}/${total} item(ns) exportado(s) em ${numeroParte} arquivo(s) ZIP.`);
+      log(`Concluído: ${saved}/${total} item(ns) em ${numeroParte} ZIP(s).`);
       return { count: saved, zip: true };
     }
 
@@ -2203,14 +2201,14 @@
       await runPool(msgs, async (m, i) => {
         let entry = null;
         try { entry = await prepareEntry(m, i); }
-        catch (e) { log(`Erro no item nº ${i + 1}: ${e?.message || e}`); }
+        catch (e) { log(`Erro no item ${i + 1}: ${e?.message || e}`); }
         if (!entry) return;
         if (await salvarIndividual(entry)) saved++;
         reportProgress();
       }, concurrency);
     }
 
-    log(`Concluído: ${saved}/${total} item(ns) baixado(s).`);
+    log(`Concluído: ${saved}/${total} item(ns).`);
     return { count: saved };
   }
 
@@ -2264,7 +2262,7 @@
         // dobrariam a carga nos servidores do WhatsApp, o suficiente para estourar o
         // tempo limite de vídeos grandes.
         if (downloadInProgress) {
-          log('Já existe uma exportação em andamento. Aguarde a conclusão.');
+          log('Exportação em andamento. Aguarde.');
           return;
         }
         downloadInProgress = true;

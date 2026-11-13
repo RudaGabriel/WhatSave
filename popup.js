@@ -1,5 +1,5 @@
 // WhatSave — popup.js
-// Versão 1.4.1 (2026-11-13): APP_VERSION atualizada para 1.4.1.
+// Versão 1.4.2 (2026-11-13): mensagens do registro de atividade resumidas.
 // Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
 // Histórico completo das versões: CHANGELOG.md no repositório.
 //
@@ -161,7 +161,7 @@ async function getActiveTab() {
     try { window.close(); } catch (_) {}
   }, 50);
 
-  throw new Error('O WhatsApp Web foi aberto em uma nova aba. Reabra a extensão quando a página terminar de carregar.');
+  throw new Error('WhatsApp Web aberto em nova aba. Reabra a extensão após o carregamento.');
 }
 
 async function runInMain(tabId, func, ...args) {
@@ -184,7 +184,7 @@ async function injectFile(tabId, file) {
 }
 
 // Precisa ser igual a APP_VERSION em inpage/app.js.
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.4.2';
 
 function waitForTabComplete(tabId, timeoutMs = 20000) {
   const deadline = Date.now() + timeoutMs;
@@ -215,20 +215,20 @@ async function ensureInjected(tabId) {
   }));
 
   if (injected?.loaded && injected.version !== APP_VERSION) {
-    log('A aba está com uma versão anterior da extensão. Recarregando o WhatsApp Web…');
+    log('Versão anterior na aba. Recarregando o WhatsApp Web…');
     await chrome.tabs.reload(tabId);
     await waitForTabComplete(tabId);
   }
 
   const hasWpp = await runInMain(tabId, () => !!window.WPP);
   if (!hasWpp) {
-    await injectFile(tabId, 'inpage/vendor/wppconnect-wa-wrapped.js').catch(e => log('Erro ao injetar a biblioteca wa-js: ' + e.message));
+    await injectFile(tabId, 'inpage/vendor/wppconnect-wa-wrapped.js').catch(e => log('Erro ao carregar o wa-js: ' + e.message));
   }
 
   const appLoaded = await runInMain(tabId, () => !!window.__WAMD_APP_LOADED__);
   if (!appLoaded) {
-    log('Carregando o módulo da página…');
-    await injectFile(tabId, 'inpage/app.js').catch(e => log('Erro ao injetar o app.js: ' + e.message));
+    log('Carregando…');
+    await injectFile(tabId, 'inpage/app.js').catch(e => log('Erro ao carregar o app.js: ' + e.message));
   }
 }
 
@@ -262,7 +262,7 @@ async function sendToPage(message) {
 
   const ok = await ensureContentScript(tab.id);
   if (!ok) {
-    log('Não foi possível comunicar com a página. Recarregue o WhatsApp Web e tente novamente.');
+    log('Sem comunicação com a página. Recarregue o WhatsApp Web.');
     return false;
   }
 
@@ -275,7 +275,7 @@ async function sendToPage(message) {
       await chrome.tabs.sendMessage(tab.id, { __to: 'wamd:content', payload: message });
       return true;
     }
-    log('Erro ao enviar o comando para a página: ' + (err?.message || String(err)));
+    log('Erro ao enviar o comando: ' + (err?.message || String(err)));
     return false;
   }
 }
@@ -303,14 +303,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       chatSel.appendChild(opt);
     }
     chatSel.disabled = false;
-    log(`${chats.length} conversa(s) encontrada(s). Selecione uma ou mais e clique em "Exportar itens selecionados".`);
+    log(`${chats.length} conversa(s) encontrada(s).`);
   } else if (data.type === 'inpage:resp' && data.cmd === 'getStats') {
     displayStats(data.payload || {});
   } else if (data.type === 'inpage:error') {
     log('Erro: ' + data.error);
   } else if (data.type === 'inpage:resp' && data.cmd === 'download') {
     const { count, chats } = data.payload || { count: 0, chats: 0 };
-    log(`Concluído: ${count} item(ns) exportado(s) de ${chats || 1} conversa(s).`);
+    log(`Concluído: ${count} item(ns) de ${chats || 1} conversa(s).`);
     bar.style.width = '100%';
     setTimeout(() => { progWrap.style.display = 'none'; bar.style.width = '0%'; }, 700);
   }
@@ -344,7 +344,7 @@ function displayStats(stats) {
   statDocuments.textContent = stats.documents || 0;
   if (statLinks) statLinks.textContent = stats.links || 0;
 
-  log(`Estatísticas carregadas: ${stats.totalMedia || 0} mídia(s) e ${stats.links || 0} link(s).`);
+  log(`${stats.totalMedia || 0} mídia(s) e ${stats.links || 0} link(s).`);
 }
 
 async function loadChatStats() {
@@ -355,7 +355,7 @@ async function loadChatStats() {
     return;
   }
 
-  log('Carregando as estatísticas da conversa…');
+  log('Carregando estatísticas…');
   await sendToPage({
     __from: 'wamd:inpage',
     type: 'popup:cmd',
@@ -376,13 +376,13 @@ closeStatsBtn?.addEventListener('click', () => {
 loadMoreBtn?.addEventListener('click', async () => {
   const ids = getSelectedChatIds();
   if (ids.length !== 1) {
-    log('Selecione exatamente uma conversa para carregar o histórico dela.');
+    log('Selecione apenas uma conversa.');
     return;
   }
   const selectedChatId = ids[0];
 
   const totalLoads = 5;
-  log(`Carregando o histórico mais antigo (${totalLoads} rodadas)…`);
+  log(`Carregando histórico (${totalLoads} rodadas)…`);
   loadMoreBtn.disabled = true;
 
   try {
@@ -400,9 +400,9 @@ loadMoreBtn?.addEventListener('click', async () => {
       await new Promise(r => setTimeout(r, 6000));
       await loadChatStats();
     }
-    log('Carregamento do histórico concluído. Confira as estatísticas atualizadas.');
+    log('Histórico carregado.');
   } catch (e) {
-    log('Erro ao carregar mais mensagens: ' + (e?.message || e));
+    log('Erro ao carregar o histórico: ' + (e?.message || e));
   } finally {
     // O botão sempre volta ao estado normal, mesmo se algo falhar.
     loadMoreBtn.disabled = false;
@@ -423,7 +423,7 @@ D('#start').addEventListener('click', async () => {
   const chatIds = getSelectedChatIds();
 
   if (!chatIds.length) {
-    log('Selecione pelo menos uma conversa na lista.');
+    log('Selecione uma conversa.');
     chatSel.scrollIntoView({ block: 'center', behavior: 'smooth' });
     chatSel.focus({ preventScroll: true });
     chatSel.classList.add('attn');
@@ -433,7 +433,7 @@ D('#start').addEventListener('click', async () => {
 
   const types = getTypes();
   if (!types.length) {
-    log('Selecione pelo menos um tipo de item.');
+    log('Selecione um tipo de item.');
     return;
   }
 
@@ -441,7 +441,7 @@ D('#start').addEventListener('click', async () => {
   const dateTo = D('#dateTo').value || '';
   // Datas no formato AAAA-MM-DD podem ser comparadas como texto.
   if (dateFrom && dateTo && dateFrom > dateTo) {
-    log('A data "De" é posterior à data "Até". Corrija o período e tente novamente.');
+    log('Período inválido: "De" é posterior a "Até".');
     D('#dateFrom').focus();
     return;
   }
@@ -463,7 +463,7 @@ D('#start').addEventListener('click', async () => {
     captureReplyCaption: D('#captureReplyCaption')?.checked !== false
   };
 
-  log(`Iniciando a exportação: ${chatIds.length} conversa(s), ZIP: ${pack.saveAsZip ? 'sim' : 'não'}, ${pack.concurrency} por vez, tipos: ${types.join(', ')}.`);
+  log(`Exportando ${chatIds.length} conversa(s)…`);
   progWrap.style.display = 'block';
   bar.style.width = '4%';
 
@@ -475,7 +475,7 @@ D('#start').addEventListener('click', async () => {
       payload: { chatIds, types, dateFrom, dateTo, naming, pack }
     });
   } catch (e) {
-    log('Erro ao iniciar a exportação: ' + (e?.message || e));
+    log('Erro ao exportar: ' + (e?.message || e));
     progWrap.style.display = 'none';
   }
 });
