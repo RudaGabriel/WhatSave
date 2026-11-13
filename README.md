@@ -1,6 +1,6 @@
 # WhatSave
 
-![Versão](https://img.shields.io/badge/vers%C3%A3o-1.4.1-e8a33d)
+![Versão](https://img.shields.io/badge/vers%C3%A3o-1.4.2-e8a33d)
 ![Testes](https://img.shields.io/badge/testes-53%20aprovados-2ea043)
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4)
 ![Chrome](https://img.shields.io/badge/Chrome-compat%C3%ADvel-4285F4?logo=googlechrome&logoColor=white)
@@ -72,14 +72,14 @@ Para exportar mensagens antigas de uma conversa, selecione somente ela e use
 
 | Opção | O que faz |
 |---|---|
-| Salvar em um único ZIP por conversa | Junta tudo em um arquivo ZIP. Conversas grandes viram `_parte01`, `_parte02`… |
-| Preservar a ordem do chat | Salva um arquivo por vez, do mais antigo para o mais recente. |
-| Manter o nome original do arquivo | Acrescenta o nome original (por exemplo, de um PDF) ao nome final. |
-| Incluir data e hora no nome | Acrescenta a data da mensagem no formato escolhido. |
-| Incluir o remetente no nome | Acrescenta quem enviou (por exemplo, `VENDEDOR A`). |
-| Incluir a legenda no nome da mídia | Acrescenta a legenda recuperada ao nome. |
-| Usar resposta direta como legenda | Usa como legenda a resposta de texto que cita exatamente aquela mídia. |
-| Usar a mensagem seguinte como legenda | Usa somente a mensagem imediatamente seguinte: texto simples, mesmo remetente e até 15 segundos depois. |
+| Salvar em ZIP | Junta tudo em um arquivo ZIP. Conversas grandes viram `_parte01`, `_parte02`… |
+| Manter a ordem do chat | Salva um arquivo por vez, do mais antigo para o mais recente. |
+| Manter o nome original | Acrescenta o nome original (por exemplo, de um PDF) ao nome final. |
+| Data e hora no nome | Acrescenta a data da mensagem no formato escolhido. |
+| Remetente no nome | Acrescenta quem enviou (por exemplo, `VENDEDOR A`). |
+| Legenda no nome | Acrescenta a legenda recuperada ao nome. |
+| Legenda por resposta direta | Usa como legenda a resposta de texto que cita exatamente aquela mídia. |
+| Legenda pela mensagem seguinte | Usa somente a mensagem imediatamente seguinte: texto simples, mesmo remetente e até 15 segundos depois. |
 | Análise profunda | Lê mais mensagens antigas (mais lento). |
 | Downloads simultâneos | Quantos arquivos são buscados ao mesmo tempo. |
 
@@ -195,12 +195,12 @@ textos, validações e ausência de rolagem horizontal.
 | Situação | O que fazer |
 |---|---|
 | A lista de conversas não aparece | Aguarde o WhatsApp Web carregar por completo e clique em **Atualizar lista**. |
-| "Não foi possível comunicar com a página" | Recarregue a aba do WhatsApp Web (F5) e reabra a extensão. |
-| "A aba está com uma versão anterior da extensão" | A extensão recarrega o WhatsApp Web automaticamente; aguarde e reabra. |
+| "Sem comunicação com a página" | Recarregue a aba do WhatsApp Web (F5) e reabra a extensão. |
+| "Versão anterior na aba" | A extensão recarrega o WhatsApp Web automaticamente; aguarde e reabra. |
 | Faltam mídias antigas | Selecione a conversa, use **Carregar mais mensagens** e exporte novamente. Mídias muito antigas podem já ter sido removidas dos servidores do WhatsApp. |
 | Uma mídia foi "ignorada" | A mídia não está disponível por completo no WhatsApp (por exemplo, expirou). Abra-a no WhatsApp Web e tente novamente. |
 | O navegador pergunta se o site pode baixar vários arquivos | Ocorre com arquivos acima de 40 MB ou com ZIP em várias partes, salvos pela própria página. Clique em **Permitir**. |
-| "A data De é posterior à data Até" | Corrija o período: a data inicial deve ser anterior ou igual à final. |
+| "Período inválido" | Corrija o período: a data inicial deve ser anterior ou igual à final. |
 | Exportação lenta | Reduza ou aumente **Downloads simultâneos** conforme a conexão; vídeos grandes levam mais tempo. |
 
 ## Limitações

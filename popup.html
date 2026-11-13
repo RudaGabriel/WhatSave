@@ -1,7 +1,7 @@
 <!doctype html>
 <!--
   WhatSave — popup.html
-  Versão 1.4.1 (2026-11-13): textos de ajuda resumidos, mais claros e diretos.
+  Versão 1.4.2 (2026-11-13): subtítulo e rótulos das opções resumidos.
   Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
   Histórico completo das versões: CHANGELOG.md no repositório.
 -->
@@ -17,7 +17,7 @@
     <img src="assets/logo.svg" width="28" height="28" alt="" />
     <div>
       <h1>WhatSave</h1>
-      <p>Exportação em massa de mídias, legendas e links do WhatsApp Web, na ordem do chat</p>
+      <p>Exporte mídias, legendas e links do WhatsApp Web</p>
     </div>
   </header>
 
@@ -89,12 +89,12 @@
     <section class="section">
       <h2>Opções</h2>
       <div class="options" style="margin-top:8px;">
-        <label class="check"><input type="checkbox" id="saveAsZip" checked> Salvar em um único ZIP por conversa</label>
+        <label class="check"><input type="checkbox" id="saveAsZip" checked> Salvar em ZIP</label>
         <p class="option-help">Conversas grandes são divididas em partes.</p>
-        <label class="check"><input type="checkbox" id="preserveChatOrder" checked> Preservar a ordem do chat</label>
+        <label class="check"><input type="checkbox" id="preserveChatOrder" checked> Manter a ordem do chat</label>
         <p class="option-help">Salva um a um, do mais antigo para o mais recente.</p>
-        <label class="check"><input type="checkbox" id="appendOrigNameAll" checked> Manter o nome original do arquivo</label>
-        <label class="check"><input type="checkbox" id="useDate"> Incluir data e hora no nome</label>
+        <label class="check"><input type="checkbox" id="appendOrigNameAll" checked> Manter o nome original</label>
+        <label class="check"><input type="checkbox" id="useDate"> Data e hora no nome</label>
 
         <div id="dateFormatGroup" class="sub-option">
           <div class="field">
@@ -113,13 +113,13 @@
           </div>
         </div>
 
-        <label class="check"><input type="checkbox" id="includeSenderName"> Incluir o remetente no nome</label>
-        <label class="check"><input type="checkbox" id="useCaptionSuffix"> Incluir a legenda no nome da mídia</label>
-        <label class="check"><input type="checkbox" id="captureReplyCaption" checked> Usar resposta direta como legenda</label>
+        <label class="check"><input type="checkbox" id="includeSenderName"> Remetente no nome</label>
+        <label class="check"><input type="checkbox" id="useCaptionSuffix"> Legenda no nome</label>
+        <label class="check"><input type="checkbox" id="captureReplyCaption" checked> Legenda por resposta direta</label>
         <p class="option-help">Só respostas que citam esta mídia.</p>
-        <label class="check"><input type="checkbox" id="captureNextMessageCaption" checked> Usar a mensagem seguinte como legenda</label>
+        <label class="check"><input type="checkbox" id="captureNextMessageCaption" checked> Legenda pela mensagem seguinte</label>
         <p class="option-help">Só o texto logo após a mídia, do mesmo remetente, em até 15 segundos.</p>
-        <label class="check"><input type="checkbox" id="deepScan"> Análise profunda (mais lenta, alcança mensagens mais antigas)</label>
+        <label class="check"><input type="checkbox" id="deepScan"> Análise profunda (mais lenta)</label>
       </div>
 
       <div class="field" style="margin-top:12px;">
@@ -148,7 +148,7 @@
   </main>
 
   <footer class="footer">
-    <span>Código aberto · Nada sai do seu computador</span>
+    <span>Código aberto · Tudo fica no seu computador</span>
     <span>Autor original: Jstarzz · Edição e manutenção: Ruda Gabriel</span>
     <a href="https://github.com/RudaGabriel/WhatSave" target="_blank" rel="noopener noreferrer">github.com/RudaGabriel/WhatSave</a>
   </footer>

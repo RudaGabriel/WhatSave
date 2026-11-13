@@ -1,5 +1,5 @@
 // WhatSave — testes/navegador/popup.mjs
-// Versão 1.4.0 (2026-11-13): validação do popup no navegador (computador e celular).
+// Versão 1.4.2 (2026-11-13): verificação da nova mensagem de período inválido.
 // Autor: Ruda Gabriel.
 // Histórico completo das versões: CHANGELOG.md no repositório.
 //
@@ -77,7 +77,7 @@ async function verificar(navegador, nome, contextoOpcoes) {
   await pagina.fill('#dateFrom', '2026-02-10');
   await pagina.fill('#dateTo', '2026-02-01');
   await pagina.click('#start');
-  assert.match(await pagina.textContent('#log'), /posterior à data "Até"/, `${nome}: validação do período`);
+  assert.match(await pagina.textContent('#log'), /Período inválido/, `${nome}: validação do período`);
 
   // Sem rolagem horizontal.
   const medidas = await pagina.evaluate(() => {
