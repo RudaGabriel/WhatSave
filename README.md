@@ -1,122 +1,220 @@
 # WhatSave
 
-A free, open-source Chrome extension (Manifest V3) that bulk downloads media
-from WhatsApp Web, images, videos, voice notes/audio, and documents, from one
-or more chats at once, either as loose files or a single ZIP.
+![Versão](https://img.shields.io/badge/vers%C3%A3o-1.4.0-e8a33d)
+![Testes](https://img.shields.io/badge/testes-53%20aprovados-2ea043)
+![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4)
+![Chrome](https://img.shields.io/badge/Chrome-compat%C3%ADvel-4285F4?logo=googlechrome&logoColor=white)
+![Edge](https://img.shields.io/badge/Edge-compat%C3%ADvel-0078D7?logo=microsoftedge&logoColor=white)
+![Firefox](https://img.shields.io/badge/Firefox-128%2B-FF7139?logo=firefoxbrowser&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-ES2022-F7DF1E?logo=javascript&logoColor=black)
+![Node.js](https://img.shields.io/badge/Node.js-18%2B%20(testes)-339933?logo=nodedotjs&logoColor=white)
+![Playwright](https://img.shields.io/badge/Playwright-teste%20de%20navegador-2EAD33?logo=playwright&logoColor=white)
+![wa-js](https://img.shields.io/badge/wa--js-4.4.3-25D366?logo=whatsapp&logoColor=white)
+![Licença](https://img.shields.io/badge/licen%C3%A7a-MIT-blue)
 
-Built by [Jstarzz](https://github.com/Jstarzz). A star on the
-[repo](https://github.com/Jstarzz/whatsave) helps other people find it.
+Extensão de navegador gratuita e de código aberto que exporta, de uma só vez,
+as **imagens, vídeos, áudios, documentos, legendas e links** de uma ou mais
+conversas do WhatsApp Web — sempre na **ordem cronológica da conversa**, em
+arquivos soltos ou em ZIP.
 
-## Install
+Tudo acontece no seu próprio computador: nada é enviado para servidores.
 
-- [Google Chrome](https://chromewebstore.google.com/detail/whatsave/adfogoknhlpeimmpgpgmoifmbjeboghk)
-- [Mozilla Firefox](https://addons.mozilla.org/firefox/addon/whatsave/)
-- [Microsoft Edge](https://microsoftedge.microsoft.com/addons/detail/obfgahgppjfldighpfohcpahmlioaelf)
+## Créditos
 
-## Features
+- **Autor original:** [Jstarzz](https://github.com/Jstarzz) — criador do WhatSave.
+- **Edição, análise e manutenção desta versão:** Ruda Gabriel.
 
-- No limits and no license key. Everything is unlocked.
-- Select multiple chats in the popup and it works through each one in turn.
-- Files save through `chrome.downloads` (via the background service worker)
-  rather than by clicking a hidden link inside the WhatsApp Web page. Chrome
-  blocks a *page* from firing off a stream of automatic downloads but does
-  not block an *extension* doing the same through its downloads API, which
-  is what makes downloading many files back to back possible at all.
-- Media is fetched fresh from WhatsApp instead of read out of whatever the
-  page happens to have cached, so files save at their original quality.
-- Media fetching can run 2, 4, 6, or 8 files at a time; **Preserve chat order** controls whether final individual saves are serialized to keep filesystem order.
-- Individual files land in `Downloads/WA Media Downloads/<Chat Name>/...`
-  instead of loose in your Downloads root.
-- Progress reporting, a bounded log panel so a large batch does not bog down
-  the popup, and "All types" / "Videos only" filter buttons.
+## Recursos
 
-## How it works
+- **Sem limites e sem chave de licença:** todos os recursos liberados.
+- **Várias conversas de uma vez:** selecione quantas quiser; elas são processadas em sequência.
+- **Ordem do chat garantida:** os arquivos são numerados (0001, 0002…) da mensagem mais antiga para a mais recente.
+- **Qualidade original:** cada mídia é buscada novamente no WhatsApp, e não copiada de uma prévia em baixa resolução.
+- **Legendas reais:** a legenda pode vir da própria mídia, de uma resposta direta à mídia ou da mensagem imediatamente seguinte — nunca de mensagens sem relação.
+- **Links:** cada mensagem com endereço da internet vira um arquivo `.txt`.
+- **ZIP inteligente:** conversas grandes são divididas automaticamente em partes, sem esgotar a memória.
+- **Downloads paralelos:** 2, 4, 6 ou 8 arquivos por vez.
+- **Funciona no computador e no celular** (navegadores que aceitam extensões).
 
-- `inpage/vendor/wppconnect-wa-wrapped.js` is the open-source
-  [WPPConnect `wa-js`](https://github.com/wppconnect-team/wa-js) library,
-  bundled as-is. It gives the extension a supported way to read chats and
-  messages from WhatsApp Web's own in-memory store. That project has its own
-  license (Apache-2.0 at the time of writing), keep its copyright notice
-  intact and check its repo for the current terms before redistributing this
-  extension.
-- `inpage/app.js` runs in the page's main world, uses `wa-js` to list chats,
-  scan chats for media messages, and download each one's underlying blob.
-- `content.js` bridges page and extension messages.
-- `background.js` is the MV3 service worker. It is the only place that
-  actually calls `chrome.downloads.download()`.
-- `popup.html` / `popup.js` / `popup.css` are the toolbar UI.
+## Instalação
 
+A extensão é instalada no modo de desenvolvedor, a partir desta pasta.
 
-## Caption recovery
+**Chrome ou Edge**
 
-This build keeps caption recovery deliberately strict. A media file can get a caption from only one of these sources:
+1. Baixe este repositório (botão **Code → Download ZIP**) e extraia a pasta.
+2. Abra `chrome://extensions` (no Edge, `edge://extensions`).
+3. Ative o **Modo do desenvolvedor**.
+4. Clique em **Carregar sem compactação** e selecione a pasta extraída.
 
-1. **Inline caption** — text stored directly on the media message.
-2. **Direct reply** — a plain-text message whose WhatsApp reply reference points exactly to that media message.
-3. **Immediate next message** — only the single text message immediately after the media in chronological chat order, from the same chat and sender, within the short proximity window. The extension never searches farther ahead for a convenient text message.
+**Firefox (128 ou superior)**
 
-If none of those conditions are met, the media remains without a caption. In particular, an unrelated later message is never used as a fallback.
+1. Abra `about:debugging#/runtime/this-firefox`.
+2. Clique em **Carregar extensão temporária** e selecione o arquivo `manifest.json`.
 
-## Export order and date format
+## Uso no dia a dia
 
-The extension builds one canonical chat timeline **before caption matching, media filtering, numbering, or saving**. Media are then numbered **oldest message -> newest message** from that fixed timeline. When **Preserve chat order** is enabled, individual files are saved sequentially in that same order; parallelism is used only while fetching/decrypting the media. The ZIP entries use the same order.
+1. Abra o [WhatsApp Web](https://web.whatsapp.com) e entre na sua conta.
+   Se ele não estiver aberto, a extensão abre o WhatsApp Web em uma nova aba;
+   basta reabrir a extensão quando a página terminar de carregar.
+2. Clique no ícone do **WhatSave**.
+3. Em **Conversas**, selecione uma ou mais conversas (segure Ctrl ou Shift para várias).
+   Se a lista estiver vazia, clique em **Atualizar lista**.
+4. Escolha os **Tipos de item** (imagens, vídeos, áudios, documentos e links).
+5. Se quiser, defina um **Período** (De/Até). Com os dois campos vazios, todas as datas entram.
+6. Ajuste as **Opções** (veja abaixo) e clique em **Exportar itens selecionados**.
+7. Acompanhe o andamento em **Atividade**.
 
-When **Add date/time to filename** is enabled, **Date format** controls only how that timestamp is written into the filename. The selected format does not change download order.
+Para exportar mensagens antigas de uma conversa, selecione somente ela e use
+**Carregar mais mensagens** antes de exportar.
 
-Available examples include `YYYY-MM-DD_HH-mm-ss`, `DD-MM-YYYY_HH-mm-ss`, `YYYY-MM-DD`, `DD-MM-YYYY`, `YYYYMMDD_HHmmss`, `YYYYMMDD`, and `YYMMDD_HHmmss`.
+### Opções
 
-## Links
+| Opção | O que faz |
+|---|---|
+| Salvar em um único ZIP por conversa | Junta tudo em um arquivo ZIP. Conversas grandes viram `_parte01`, `_parte02`… |
+| Preservar a ordem do chat | Salva um arquivo por vez, do mais antigo para o mais recente. |
+| Manter o nome original do arquivo | Acrescenta o nome original (por exemplo, de um PDF) ao nome final. |
+| Incluir data e hora no nome | Acrescenta a data da mensagem no formato escolhido. |
+| Incluir o remetente no nome | Acrescenta quem enviou (por exemplo, `VENDEDOR A`). |
+| Incluir a legenda no nome da mídia | Acrescenta a legenda recuperada ao nome. |
+| Usar resposta direta como legenda | Usa como legenda a resposta de texto que cita exatamente aquela mídia. |
+| Usar a mensagem seguinte como legenda | Usa somente a mensagem imediatamente seguinte: texto simples, mesmo remetente e até 15 segundos depois. |
+| Análise profunda | Lê mais mensagens antigas (mais lento). |
+| Downloads simultâneos | Quantos arquivos são buscados ao mesmo tempo. |
 
-Select **Links** under Media type to export chat messages that contain web addresses or WhatsApp link-preview URLs. Each link message becomes one UTF-8 `.txt` file; the first URL is included in the filename and all extracted URLs are written inside the file.
+### Como os arquivos são nomeados
 
-- Links are exported only when the message belongs to a selected chat and falls inside the configured date range. No global URL search is used.
-- WhatSave first reads URL fields from the message model and link preview. If WhatsApp Web exposes the link only in the visible chat DOM, it falls back to the message bubble's clickable anchors/text.
-- A media item whose caption contains a URL stays a media item; it is not duplicated as a link.
+```
+0001_<Conversa>[_<Remetente>][_<Data>][_<Legenda>][_<Nome original>].<extensão>
+```
 
-## Document captions
+Exemplo: `0001_Celular do Caixa 1_2026-09-23_15-30-45_Pedido 12.jpg`
 
-For documents/PDFs, a `caption`/`body` value identical to the file name is treated as file metadata, not as a caption. If no valid caption exists, the media remains without one. Same-second media/text pairs use the visible WhatsApp message order (or `sequence`/`rowId`) when available; otherwise they are not guessed.
+O número sequencial fica sempre no início, para que o Explorador do Windows
+mostre os arquivos na ordem da conversa. Caracteres proibidos no Windows são
+trocados por `_`, e nomes reservados (como `CON`) são evitados.
 
-## Installing it unpacked
+Formatos de data disponíveis: `AAAA-MM-DD_HH-mm-ss`, `AAAA-MM-DD`,
+`DD-MM-AAAA_HH-mm-ss`, `DD-MM-AAAA`, `AAAAMMDD_HHmmss`, `AAAAMMDD` e
+`AAMMDD_HHmmss`.
 
-1. Open `chrome://extensions`.
-2. Enable **Developer mode** (top right).
-3. Click **Load unpacked** and select this folder.
-4. Open [web.whatsapp.com](https://web.whatsapp.com), log in, then click the
-   extension icon.
+### Onde os arquivos ficam
 
-## Using it
+- **Arquivos soltos:** `Downloads/WhatSave/<Conversa>/`.
+- **ZIP:** na raiz da pasta `Downloads`, com o nome `<Conversa>_WhatSave.zip`
+  (ou `<Conversa>_WhatSave_parte01.zip`, `_parte02`… quando dividido).
+- **Arquivos acima de 40 MB:** na raiz da pasta `Downloads`, com o nome da
+  conversa no início. Isso acontece porque a comunicação interna da extensão
+  aceita no máximo 64 MB por mensagem.
 
-1. Select one or more chats from the list (click **Update chat list** if
-   nothing shows up yet).
-2. Optionally set a date range, pick media types, and adjust naming options.
-3. Optionally use **Load More Messages** first, for a single chat, if you
-   need media further back than WhatsApp Web has already loaded locally.
-4. Click **Download all**. Files save individually, or as one ZIP per chat
-   if **Save as single ZIP** is checked.
+### Como as legendas são escolhidas
 
-## Notes and limits
+Uma mídia só recebe legenda de uma destas fontes, nesta ordem:
 
-- This only ever touches chats you already have open in your own WhatsApp
-  Web session. It cannot access anything you do not already have access to.
-- WhatsApp Web generally only keeps roughly a year of history loaded
-  locally. **Load More Messages** nudges it to fetch further back, but very
-  old media may already be gone from WhatsApp's servers.
-- Media quality is whatever the sender's own device uploaded to WhatsApp.
-  There is no separate hidden "HD" copy on the server for this extension to
-  fetch instead, it downloads the same original file WhatsApp Web itself
-  would show you.
-- Very large batches will still take a while. Media has to be decrypted and
-  fetched one file at a time from WhatsApp's side, the parallel-download
-  setting only controls how many of those requests are in flight together.
-- This project is not affiliated with, endorsed by, or associated with
-  WhatsApp or Meta.
+1. **Legenda própria** — o texto escrito junto com a mídia.
+2. **Resposta direta** — uma mensagem de texto que cita exatamente aquela mídia.
+3. **Mensagem imediatamente seguinte** — somente a próxima mensagem, se for
+   texto simples, do mesmo remetente e enviada em até 15 segundos.
 
-## Privacy
+Se nenhuma condição for comprovada, a mídia fica sem legenda. Em documentos, o
+nome do arquivo nunca é tratado como legenda.
 
-Nothing is collected, stored, or transmitted anywhere. See `PRIVACY.md`.
+### Links
 
-## License
+Ao marcar **Links**, cada mensagem que contém um endereço da internet vira um
+arquivo `.txt` (UTF-8) com todos os endereços encontrados. O primeiro endereço
+também aparece no nome do arquivo. Somente links da conversa selecionada e do
+período escolhido são exportados. Uma mídia cuja legenda contém um link
+continua sendo exportada como mídia.
 
-MIT for the code in this repository (see `LICENSE`). The bundled `wa-js`
-vendor file remains under its own upstream license, see the note above.
+## Tecnologias e bibliotecas
+
+| Tecnologia | Uso |
+|---|---|
+| JavaScript (ES2022) | Todo o código da extensão, sem etapa de compilação. |
+| WebExtensions — Manifest V3 | Estrutura da extensão para Chrome, Edge e Firefox. |
+| `chrome.downloads` | Salvamento dos arquivos na pasta Downloads. |
+| `chrome.scripting` | Injeção dos scripts na página do WhatsApp Web. |
+| wa-js 4.4.3 (`inpage/vendor/wppconnect-wa-wrapped.js`) | Leitura das conversas e mensagens já carregadas no WhatsApp Web. Distribuída sem alterações, sob a sua própria licença (Apache-2.0), cujo aviso de direitos autorais deve ser mantido. |
+| Gerador de ZIP próprio | ZIP sem compressão (STORE), com nomes em UTF-8 e CRC32. |
+| Node.js 18+ — `node:test` | Testes automatizados, sem dependências externas. |
+| Playwright (opcional) | Teste do popup em navegador real, no computador e no celular. |
+
+## Estrutura dos arquivos
+
+| Arquivo | Função |
+|---|---|
+| `manifest.json` | Configuração da extensão (permissões, scripts, ícones). |
+| `background.js` | Service worker: único ponto que chama `chrome.downloads.download()`. |
+| `content.js` | Ponte entre a página do WhatsApp Web e a extensão. |
+| `inpage/app.js` | Lógica principal: lista conversas, lê mensagens, recupera legendas, baixa e salva. |
+| `inpage/vendor/wppconnect-wa-wrapped.js` | Biblioteca wa-js (terceiros, sem alterações). |
+| `popup.html`, `popup.js`, `popup.css` | Janela da extensão. |
+| `assets/`, `icons/` | Logotipo e ícones. |
+| `testes/` | Testes automatizados e teste de navegador. |
+| `CHANGELOG.md` | Histórico completo das versões de cada arquivo. |
+| `PRIVACY.md` | Política de privacidade. |
+
+## Comandos internos (popup → página)
+
+A extensão não tem servidor nem API externa. O popup conversa com a página por
+mensagens internas (`popup:cmd`):
+
+| Comando | Dados enviados | Resposta |
+|---|---|---|
+| `listChats` | — | Lista de conversas (`id`, `name`). |
+| `getStats` | `selectedChatId` | Período e quantidade de mídias e links carregados. |
+| `loadMore` | `selectedChatId` | Pede ao WhatsApp Web mensagens mais antigas. |
+| `download` | `chatIds`, `types`, `dateFrom`, `dateTo`, `naming`, `pack` | Quantidade de itens exportados. |
+
+## Desenvolvimento e testes
+
+Requisitos: [Node.js](https://nodejs.org) 18 ou superior. Não há dependências a instalar.
+
+```bash
+npm test
+```
+
+Verifica a sintaxe dos scripts e executa os 53 testes automatizados (legendas,
+links, nomes de arquivo, datas, ordem, ZIP e consistência do projeto).
+
+```bash
+npm install --no-save playwright && npx playwright install chromium
+```
+
+```bash
+npm run test:navegador
+```
+
+Abre o popup no Chromium, no tamanho de computador e de celular, e confere
+textos, validações e ausência de rolagem horizontal.
+
+## Solução de problemas
+
+| Situação | O que fazer |
+|---|---|
+| A lista de conversas não aparece | Aguarde o WhatsApp Web carregar por completo e clique em **Atualizar lista**. |
+| "Não foi possível comunicar com a página" | Recarregue a aba do WhatsApp Web (F5) e reabra a extensão. |
+| "A aba está com uma versão anterior da extensão" | A extensão recarrega o WhatsApp Web automaticamente; aguarde e reabra. |
+| Faltam mídias antigas | Selecione a conversa, use **Carregar mais mensagens** e exporte novamente. Mídias muito antigas podem já ter sido removidas dos servidores do WhatsApp. |
+| Uma mídia foi "ignorada" | A mídia não está disponível por completo no WhatsApp (por exemplo, expirou). Abra-a no WhatsApp Web e tente novamente. |
+| O navegador pergunta se o site pode baixar vários arquivos | Ocorre com arquivos acima de 40 MB ou com ZIP em várias partes, salvos pela própria página. Clique em **Permitir**. |
+| "A data De é posterior à data Até" | Corrija o período: a data inicial deve ser anterior ou igual à final. |
+| Exportação lenta | Reduza ou aumente **Downloads simultâneos** conforme a conexão; vídeos grandes levam mais tempo. |
+
+## Limitações
+
+- A extensão só acessa conversas que você já vê no seu próprio WhatsApp Web.
+- O WhatsApp Web mantém localmente cerca de um ano de histórico; mensagens mais antigas precisam ser carregadas antes.
+- A qualidade é a mesma do arquivo original enviado ao WhatsApp; não existe uma cópia "HD" separada.
+
+## Privacidade
+
+Consulte [PRIVACY.md](PRIVACY.md). Em resumo: nenhum dado é coletado, enviado
+ou vendido.
+
+## Licença
+
+Código sob a licença MIT (veja [LICENSE](LICENSE)). A biblioteca wa-js em
+`inpage/vendor` segue a sua própria licença.

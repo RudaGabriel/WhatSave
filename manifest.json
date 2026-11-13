@@ -1,8 +1,10 @@
 {
   "manifest_version": 3,
   "name": "WhatSave",
-  "description": "Bulk export WhatsApp Web media, real captions, direct replies, immediate-next captions, and viewing links in strict chronological chat order.",
-  "version": "1.3.9",
+  "description": "Exporte em massa mídias, legendas reais, respostas diretas e links do WhatsApp Web, na ordem cronológica da conversa.",
+  "version": "1.4.0",
+  "author": "Ruda Gabriel",
+  "homepage_url": "https://github.com/RudaGabriel/WhatSave",
   "icons": {
     "16": "icons/16.png",
     "32": "icons/32.png",
@@ -27,12 +29,13 @@
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "whatsave@jstarzz.github.io",
+      "id": "whatsave@rudagabriel.github.io",
       "strict_min_version": "128.0"
     }
   },
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_title": "WhatSave"
   },
   "content_scripts": [
     {

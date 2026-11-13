@@ -1,3 +1,11 @@
+/*
+  WhatSave — popup.css
+  Versão 1.4.0 (2026-11-13): comentários em português do Brasil; rodapé em
+  coluna para acomodar os créditos; ajuste para celulares e tablets (classe
+  "celular"), sem rolagem horizontal.
+  Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
+  Histórico completo das versões: CHANGELOG.md no repositório.
+*/
 :root {
   --bg: #0c0b0a;
   --surface: #100e0d;
@@ -45,7 +53,7 @@ body {
   line-height: 1.5;
 }
 
-/* Header */
+/* Cabeçalho */
 
 .app-header {
   display: flex;
@@ -71,7 +79,7 @@ body {
   color: var(--text-muted);
 }
 
-/* Layout */
+/* Estrutura */
 
 main { padding: var(--s4); }
 
@@ -104,7 +112,7 @@ h2 {
 .row { display: flex; gap: var(--s2); }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
 
-/* Fields */
+/* Campos */
 
 label { font-size: var(--fs-sm); color: var(--text-muted); }
 
@@ -134,7 +142,7 @@ select[multiple] { padding: var(--s1); }
   outline-offset: 2px;
 }
 
-/* Checkbox rows. The label is the hit target, so it carries the height. */
+/* Linhas de caixa de seleção: o rótulo é a área clicável, por isso define a altura. */
 
 .check {
   display: flex;
@@ -186,7 +194,7 @@ select[multiple] { padding: var(--s1); }
 }
 
 
-/* Buttons */
+/* Botões */
 
 .btn {
   font: inherit;
@@ -246,7 +254,7 @@ select[multiple] { padding: var(--s1); }
   cursor: not-allowed;
 }
 
-/* Stats */
+/* Estatísticas */
 
 .stats { border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s3); }
 
@@ -268,7 +276,7 @@ select[multiple] { padding: var(--s1); }
 .stats dt { color: var(--text-muted); }
 .stats dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
 
-/* Progress and log */
+/* Progresso e registro de atividade */
 
 .progress {
   height: 4px;
@@ -300,7 +308,7 @@ select[multiple] { padding: var(--s1); }
   white-space: pre-wrap;
 }
 
-/* Footer */
+/* Rodapé */
 
 .footer {
   padding: var(--s2) var(--s4) var(--s3);
@@ -308,9 +316,9 @@ select[multiple] { padding: var(--s1); }
   font-size: var(--fs-xs);
   color: var(--text-subtle);
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--s2);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
 }
 
 .footer span { padding-block: var(--s1); }
@@ -328,3 +336,12 @@ select[multiple] { padding: var(--s1); }
 @media (prefers-reduced-motion: reduce) {
   .bar { transition: none; }
 }
+
+/* Celulares e tablets (por exemplo, Firefox para Android, que abre o popup em
+   tela cheia): a classe "celular" é definida pelo popup.js a partir do tamanho
+   físico da tela, que no computador é sempre maior. Assim, o popup ocupa a
+   largura da tela, sem rolagem horizontal, e o computador não é afetado. */
+html.celular body { width: auto; max-width: 100vw; overflow-x: hidden; }
+html.celular .grid-2 { grid-template-columns: 1fr; }
+html.celular .footer a { word-break: break-all; }
+html.celular .section-head { flex-wrap: wrap; }

@@ -1,15 +1,25 @@
-// inpage/app.js: runs in the WhatsApp Web page's MAIN world (via WPP / wa-js).
-// Finds media messages in a chat, downloads their blobs, and hands them off
-// to the extension (background.js) to save via chrome.downloads.
+// WhatSave — inpage/app.js
+// Versão 1.4.0 (2026-11-13): textos e comentários em português do Brasil;
+// salvamento em ordem com janela limitada de memória; ZIP dividido em partes
+// automáticas; arquivos acima de 40 MB salvos diretamente pela página; índice
+// único de respostas; varreduras do DOM limitadas; datas inválidas ou
+// invertidas tratadas; pasta de destino "WhatSave".
+// Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
+// Histórico completo das versões: CHANGELOG.md no repositório.
+//
+// Executado no contexto principal (MAIN world) da página do WhatsApp Web, por
+// meio do WPP (wa-js). Localiza mídias e links de uma conversa, baixa os
+// arquivos e os entrega à extensão (background.js), que os salva com
+// chrome.downloads.
 (function () {
-  // Bumped whenever the popup <-> page message format changes. The popup
-  // compares this against its own copy so a tab left open across an extension
-  // update does not keep serving an older app.js to a newer popup.
-  const APP_VERSION = '1.3.9';
+  // Atualizada sempre que o formato das mensagens popup <-> página muda. O popup
+  // compara este valor com o seu; assim, uma aba aberta antes de uma atualização
+  // da extensão não continua usando um app.js antigo com um popup novo.
+  const APP_VERSION = '1.4.0';
 
-  // Guard against double injection.
+  // Evita a injeção dupla do script.
   if (window.__WAMD_APP_LOADED__) {
-    window.postMessage({ __from: 'wamd:inpage', type: 'wa:log', message: 'app.js already loaded' }, '*');
+    window.postMessage({ __from: 'wamd:inpage', type: 'wa:log', message: 'O app.js já estava carregado.' }, '*');
     return;
   }
   window.__WAMD_APP_LOADED__ = true;
@@ -21,19 +31,19 @@
   function withTimeout(promise, ms, label) {
     let t;
     const timeout = new Promise((_, reject) => {
-      t = setTimeout(() => reject(new Error(`TIMEOUT after ${ms}ms: ${label}`)), ms);
+      t = setTimeout(() => reject(new Error(`Tempo limite de ${ms} ms excedido: ${label}`)), ms);
     });
     return Promise.race([promise, timeout]).finally(() => clearTimeout(t));
   }
 
   function getTimeoutForMedia(m) {
     const kind = (m.type || m.mediaType || '').toLowerCase();
-    // WhatsApp decrypts and re-fetches each file server-side, so a long video
-    // over a slow link can legitimately sit well past 20s before the blob
-    // lands. Cutting it off early loses media that would have arrived.
+    // O WhatsApp descriptografa e busca cada arquivo novamente no servidor; um vídeo
+    // longo em conexão lenta pode levar bem mais de 20 s. Interromper antes do
+    // tempo perderia mídias que chegariam normalmente.
     if (kind === 'video') return 45000;
     if (kind === 'document') return 20000;
-    return 10000; // images/audio
+    return 10000; // imagens e áudios
   }
 
   function getMediaStage(m) {
@@ -49,8 +59,8 @@
     );
   }
 
-  // Cheap pre-check to skip messages we already know can't be downloaded,
-  // instead of paying for a doomed download attempt (and its timeout).
+  // Verificação rápida para ignorar mensagens que sabidamente não podem ser
+  // baixadas, evitando uma tentativa fadada ao erro (e o seu tempo limite).
   function isProbablyUnavailableByMessage(m) {
     const kind = (m.type || m.mediaType || '').toLowerCase();
     const md = m?.mediaData || m?._mediaData || null;
@@ -76,10 +86,9 @@
   }
 
   function sanitizeFilename(s) {
-    // Keep Unicode (including Portuguese accents) intact. NFC prevents
-    // visually identical characters from being stored as different
-    // combining-codepoint sequences. Control characters are removed because
-    // they are not valid in Windows filenames.
+    // Mantém o Unicode (inclusive acentos) intacto. A normalização NFC evita que
+    // caracteres visualmente idênticos sejam gravados como sequências diferentes.
+    // Caracteres de controle são removidos porque o Windows não os aceita em nomes.
     const clean = String(s || '')
       .normalize('NFC')
       .replace(/[\u0000-\u001F\u007F]/g, '')
@@ -119,7 +128,7 @@
 
   async function resolveSenderName(message) {
     if (!message) return '';
-    if (message.fromMe || message.id?.fromMe) return 'Me';
+    if (message.fromMe || message.id?.fromMe) return 'Eu';
 
     const embedded = [
       message.senderObj?.formattedName,
@@ -153,7 +162,7 @@
         contact?.formattedName || contact?.pushname || contact?.name || contact?.shortName || ''
       );
     } catch (e) {
-      log(`resolveSenderName(): contact lookup failed for ${senderId}: ${e?.message || e}`);
+      log(`resolveSenderName(): falha ao consultar o contato ${senderId}: ${e?.message || e}`);
     }
 
     if (!resolved) resolved = cleanSenderFallback(senderId);
@@ -199,7 +208,7 @@
     return '';
   }
 
-  /** Best available extension: original filename > mimetype > kind-based fallback. */
+  /** Melhor extensão disponível: nome original > tipo MIME > tipo da mensagem. */
   function resolveExt({ message, mime, kind }) {
     const origName = message?.filename || message?.fileName || message?.title || message?.name || '';
     let ext = extFromFilename(origName);
@@ -257,17 +266,17 @@
     }
 
     const numberPart = String(index).padStart(4, '0');
-    // Keep the sequence number first so Windows Explorer naturally sorts files
-    // in the exact download/chat order without requiring a custom sort.
+    // O número sequencial vem primeiro para que o Explorador do Windows ordene os
+    // arquivos exatamente na ordem do chat, sem classificação personalizada.
     const base = `${numberPart}_${sanitizeFilename(chatName || 'Chat')}${senderPart}${datePart}${suffix}`;
     const ext = extHint || resolveExt({ message, mime, kind });
     return base + (ext ? '.' + ext : '');
   }
 
-  // --- readiness, based on the APIs we actually call ---
-  // On some recent wa-js builds WPP.webpack.isReady() can stay false even
-  // once WPP.chat is fully usable, which used to add an 8s stall to every
-  // command. Poll for the concrete APIs instead.
+  // --- Prontidão, baseada nas APIs efetivamente usadas ---
+  // Em algumas versões do wa-js, WPP.webpack.isReady() continua falso mesmo com
+  // WPP.chat totalmente utilizável, o que acrescentava 8 s a cada comando. Por
+  // isso, a verificação consulta diretamente as APIs necessárias.
   let wppReadyConfirmed = false;
 
   async function ensureReady(timeoutMs = 2500) {
@@ -287,7 +296,7 @@
       await new Promise(r => setTimeout(r, 100));
     }
 
-    log('ensureReady(): WPP.chat APIs not available yet, continuing best-effort');
+    log('ensureReady(): as APIs do WPP.chat ainda não estão disponíveis; a operação continuará assim mesmo.');
     return false;
   }
 
@@ -300,7 +309,7 @@
         name: c?.formattedTitle || c?.contact?.pushname || c?.contact?.name || c?.name || c?.id?.user || 'Chat'
       }));
     } catch (e) {
-      log('listChats() ERROR: ' + (e?.message || e));
+      log('listChats(): erro: ' + (e?.message || e));
       return [];
     }
   }
@@ -318,11 +327,11 @@
       try {
         msgs = await window.WPP.chat.getMessages(chatId, { count: 10000 });
       } catch (e1) {
-        log('getChatStats(): getMessages(10000) failed, retrying with 3000: ' + (e1?.message || e1));
+        log('getChatStats(): getMessages(10000) falhou; nova tentativa com 3000: ' + (e1?.message || e1));
         try {
           msgs = await window.WPP.chat.getMessages(chatId, { count: 3000 });
         } catch (e2) {
-          log('getChatStats(): getMessages(3000) failed, retrying with defaults: ' + (e2?.message || e2));
+          log('getChatStats(): getMessages(3000) falhou; nova tentativa com os valores padrão: ' + (e2?.message || e2));
           msgs = await window.WPP.chat.getMessages(chatId);
         }
       }
@@ -333,8 +342,8 @@
           return c && c !== chatId;
         });
 
-        // If wa-js hasn't initialized this chat yet it can return another
-        // chat's messages; open it once and retry.
+        // Se o wa-js ainda não inicializou esta conversa, pode devolver mensagens de
+        // outra; a conversa é aberta uma vez e a leitura é repetida.
         if (mismatched.length && mismatched.length > Math.floor(msgs.length * 0.6)) {
           try {
             if (window.WPP?.chat?.openChatBottom) await window.WPP.chat.openChatBottom(chatId);
@@ -342,7 +351,7 @@
             await new Promise(r => setTimeout(r, 250));
             msgs = await window.WPP.chat.getMessages(chatId, { count: 5000 });
           } catch (e3) {
-            log('getChatStats(): retry after openChat* failed: ' + (e3?.message || e3));
+            log('getChatStats(): a nova tentativa após abrir a conversa falhou: ' + (e3?.message || e3));
           }
         }
 
@@ -352,15 +361,15 @@
         });
       }
 
-      // Link counts come from the same selected-chat message history used by export.
-      // This avoids depending on WA-JS media='url', which is inconsistent across
-      // WhatsApp Web builds.
+      // A contagem de links usa o mesmo histórico da conversa selecionada usado na
+      // exportação, sem depender da consulta media='url' do wa-js, que é
+      // inconsistente entre versões do WhatsApp Web.
 
       if (!msgs || msgs.length === 0) {
-        return { dateRange: 'No messages loaded', totalMedia: 0, links: 0, totalItems: 0, images: 0, videos: 0, audio: 0, documents: 0 };
+        return { dateRange: 'Nenhuma mensagem carregada', totalMedia: 0, links: 0, totalItems: 0, images: 0, videos: 0, audio: 0, documents: 0 };
       }
 
-      // Capture links from the rendered chat before classifying messages.
+      // Registra os links da conversa exibida antes de classificar as mensagens.
       collectDomLinkCache(true);
 
       const mediaMessages = msgs.filter(m => {
@@ -388,7 +397,7 @@
         }
       });
 
-      let dateRange = 'Unknown';
+      let dateRange = 'Desconhecido';
       if (oldestDate && newestDate) {
         const formatDate = (ts) => {
           const d = new Date(ts * 1000);
@@ -399,17 +408,16 @@
 
       return { dateRange, totalMedia: mediaMessages.length, links: linkMessages.length, totalItems: mediaMessages.length + linkMessages.length, images, videos, audio, documents };
     } catch (e) {
-      log('getChatStats() ERROR: ' + (e?.message || e));
-      return { dateRange: 'Error loading stats', totalMedia: 0, images: 0, videos: 0, audio: 0, documents: 0 };
+      log('getChatStats(): erro: ' + (e?.message || e));
+      return { dateRange: 'Erro ao carregar as estatísticas', totalMedia: 0, links: 0, totalItems: 0, images: 0, videos: 0, audio: 0, documents: 0 };
     }
   }
 
-  // Find the scrollable message-list container. wa-js/getMessages only reads
-  // from WhatsApp's local store, so to reach further back in history we still
-  // need to nudge WhatsApp's own virtualized list into fetching older
-  // messages from the server; there's no public wa-js API for that.
-  // Matched structurally rather than by classname, since WhatsApp Web's
-  // classnames change between builds.
+  // Localiza o contêiner rolável da lista de mensagens. O wa-js (getMessages) só
+  // lê o armazenamento local do WhatsApp; para alcançar mensagens mais antigas é
+  // preciso fazer a própria lista virtualizada do WhatsApp buscá-las no servidor,
+  // pois não há API pública do wa-js para isso. A busca é estrutural, e não por
+  // nome de classe, porque as classes do WhatsApp Web mudam entre versões.
   function findScrollContainer() {
     const candidates = [
       document.querySelector('[role="application"]'),
@@ -431,9 +439,9 @@
       const rect = btn.getBoundingClientRect();
       const text = (btn.textContent || '').trim();
 
-      // The "load earlier messages" button sits near the top of the pane and
-      // has a fairly long, sentence-like label (localized, so we don't match
-      // on exact text, just its shape and position).
+      // O botão de carregar mensagens anteriores fica perto do topo do painel e tem
+      // um rótulo longo, em forma de frase (traduzido conforme o idioma; por isso a
+      // busca considera o formato e a posição, e não o texto exato).
       if (rect.top >= 0 && rect.top < 400 && text.length > 35 && text.length < 150) {
         const lower = text.toLowerCase();
         const excluded = ['call', 'video', 'menu', 'search', 'emoji', 'attach', 'send'];
@@ -455,36 +463,40 @@
 
       const scrollContainer = findScrollContainer();
       if (!scrollContainer) {
-        log('loadMoreMessages(): could not find the scrollable message list');
-        return { ok: false, error: 'Cannot find scroll container' };
+        log('loadMoreMessages(): a lista rolável de mensagens não foi encontrada.');
+        return { ok: false, error: 'Lista rolável de mensagens não encontrada' };
       }
 
-      // Scroll to the top in steps, giving WhatsApp time to load history as
-      // it goes rather than jumping straight to scrollTop = 0.
+      // Rola até o topo em etapas, dando tempo ao WhatsApp para carregar o histórico,
+      // em vez de ir diretamente para scrollTop = 0.
       for (let i = 0; i < 10; i++) {
         scrollContainer.scrollTop = Math.max(0, scrollContainer.scrollTop - 500);
         await new Promise(r => setTimeout(r, 200));
       }
       scrollContainer.scrollTop = 0;
 
-      // Keep it pinned to the top briefly while WhatsApp settles content in.
+      // Mantém a lista presa ao topo por alguns instantes, enquanto o WhatsApp carrega.
       let scrollLocked = true;
       const lockScroll = () => { if (scrollLocked) scrollContainer.scrollTop = 0; };
       scrollContainer.addEventListener('scroll', lockScroll);
-      await new Promise(r => setTimeout(r, 1500));
-      scrollContainer.scrollTop = 0;
-      await new Promise(r => setTimeout(r, 500));
-
-      const loadMoreBtn = findLoadEarlierButton();
-      scrollLocked = false;
-      scrollContainer.removeEventListener('scroll', lockScroll);
+      let loadMoreBtn = null;
+      try {
+        await new Promise(r => setTimeout(r, 1500));
+        scrollContainer.scrollTop = 0;
+        await new Promise(r => setTimeout(r, 500));
+        loadMoreBtn = findLoadEarlierButton();
+      } finally {
+        // A trava de rolagem é sempre liberada, mesmo se algo falhar acima.
+        scrollLocked = false;
+        scrollContainer.removeEventListener('scroll', lockScroll);
+      }
 
       if (!loadMoreBtn) {
-        return { ok: true, clicked: false, message: 'No load-more button found (all history may already be loaded)' };
+        return { ok: true, clicked: false, message: 'Botão de carregar mensagens anteriores não encontrado (todo o histórico pode já estar carregado).' };
       }
 
       if (!document.contains(loadMoreBtn)) {
-        return { ok: false, error: 'Button disappeared before it could be clicked' };
+        return { ok: false, error: 'O botão desapareceu antes de ser clicado' };
       }
 
       try {
@@ -496,7 +508,7 @@
       await new Promise(r => setTimeout(r, 3000));
       return { ok: true, clicked: true };
     } catch (e) {
-      log('loadMoreMessages() ERROR: ' + (e?.message || e));
+      log('loadMoreMessages(): erro: ' + (e?.message || e));
       return { ok: false, error: e.message };
     }
   }
@@ -509,24 +521,43 @@
 
   function dayRangeToEpochSeconds(dateStr) {
     if (!dateStr) return { start: undefined, end: undefined };
-    const [y, m, d] = dateStr.split('-').map(Number);
+    const [y, m, d] = String(dateStr).split('-').map(Number);
+    // Data malformada não pode virar NaN (o filtro deixaria tudo passar).
+    if (![y, m, d].every(Number.isFinite) || m < 1 || m > 12 || d < 1 || d > 31) {
+      return { start: undefined, end: undefined };
+    }
     const start = Math.floor(new Date(y, m - 1, d, 0, 0, 0, 0).getTime() / 1000);
     const end = Math.floor(new Date(y, m - 1, d, 23, 59, 59, 999).getTime() / 1000);
     return { start, end };
   }
 
-  // --- Caption recovery ----------------------------------------------------
-  // Caption sources, in priority order:
-  //   1) caption/body already attached to the media message;
-  //   2) the one literal next message in chat order, only when consecutive
-  //      message-order metadata proves adjacency;
-  //   3) a plain-text reply whose explicit quoted-message ID points to this media.
+  // Converte o intervalo do popup em segundos. Datas invertidas são trocadas,
+  // para que "De" posterior a "Até" não resulte em exportação vazia.
+  function intervaloDatas(dateFrom, dateTo) {
+    let from = dateFrom ? dayRangeToEpochSeconds(dateFrom).start : undefined;
+    let to = dateTo ? dayRangeToEpochSeconds(dateTo).end : undefined;
+    if (from != null && to != null && from > to) {
+      const inicio = dayRangeToEpochSeconds(dateTo).start;
+      const fim = dayRangeToEpochSeconds(dateFrom).end;
+      from = inicio;
+      to = fim;
+    }
+    return { from, to };
+  }
+
+  // --- Recuperação de legendas ------------------------------------------------
+  // Fontes de legenda, em ordem de prioridade:
+  //   1) legenda/corpo já presentes na própria mensagem de mídia;
+  //   2) uma resposta de texto cuja referência de citação aponta exatamente para
+  //      esta mídia;
+  //   3) a única mensagem imediatamente seguinte na ordem do chat, apenas quando
+  //      os metadados de ordem comprovam a adjacência.
   //
-  // Important: the next-message rule does NOT search later messages. It does
-  // not fall back to timestamps alone, because timestamps can be identical or
-  // too coarse to establish adjacency. If WhatsApp/wa-js does not expose a
-  // reliable consecutive order value (rowId or sequence), no next-message
-  // caption is assigned. This deliberately favors precision over guesses.
+  // Importante: a regra da mensagem seguinte NÃO procura mensagens posteriores e
+  // não se baseia apenas no horário, que pode ser idêntico ou impreciso demais
+  // para comprovar adjacência. Sem um critério confiável de desempate (ordem na
+  // tela, sequence ou rowId), nenhuma legenda é atribuída. A precisão tem
+  // prioridade sobre suposições.
   const STANDALONE_CAPTION_MAX_GAP_SECONDS = 15;
 
   function safeRead(obj, key) {
@@ -549,9 +580,9 @@
     const ids = new Set();
     if (!message) return [];
 
-    // Read only fields that semantically identify the quoted/replied-to
-    // message. Every property access is protected because some WhatsApp builds
-    // throw when a non-reply message is inspected.
+    // Lê apenas campos que identificam semanticamente a mensagem citada. Todo
+    // acesso é protegido, porque algumas versões do WhatsApp lançam erro ao
+    // inspecionar uma mensagem que não é resposta.
     const scalarKeys = [
       'quotedStanzaID', 'quotedStanzaId',
       '__x_quotedStanzaID', '__x_quotedStanzaId'
@@ -573,8 +604,8 @@
       }
     }
 
-    // quotedMsg is safe to inspect through safeRead; we never invoke a method
-    // such as getQuotedMsg(), which can throw "does not have a reply".
+    // quotedMsg é lido com safeRead; nunca se chama um método como
+    // getQuotedMsg(), que pode lançar o erro "does not have a reply".
     const quoted = safeRead(message, 'quotedMsg');
     if (quoted) {
       const direct = candidateString(quoted);
@@ -587,7 +618,7 @@
       }
     }
 
-    // Some builds expose the raw quoted key in quotedMsgPayload.
+    // Algumas versões expõem a chave citada bruta em quotedMsgPayload.
     const payload = safeRead(message, 'quotedMsgPayload');
     if (typeof payload === 'string' && payload.trim()) {
       try {
@@ -615,7 +646,7 @@
               }
             }
           }
-          // Only descend through objects that are plausibly part of a quote key.
+          // Desce apenas por objetos que provavelmente fazem parte da chave citada.
           for (const k of ['quotedMsg', 'quotedMessage', 'messageKey', 'key']) {
             const child = safeRead(node, k);
             if (child && typeof child === 'object') stack.push(child);
@@ -631,29 +662,29 @@
     if (!message) return '';
     const id = safeRead(message, 'id');
 
-    // wa-js normally exposes the bare message/stanza id as id.id. Prefer that
-    // because the serialized group id may also contain a participant id at the
-    // end, which is NOT the message id.
+    // O wa-js normalmente expõe o id puro da mensagem em id.id. Ele é preferido
+    // porque o id serializado de grupo pode terminar com o id do participante,
+    // que NÃO é o id da mensagem.
     const innerId = candidateString(id && typeof id === 'object' ? safeRead(id, 'id') : '');
     if (innerId) return innerId;
 
     const serialized = candidateString(id);
     if (!serialized) return '';
 
-    // Common serialized message shapes:
-    //   false_<remote>_<messageId>
-    //   false_<remote>_<messageId>_<participant>
-    //   true_<remote>_<messageId>
-    // In all of these, the message/stanza id is the third component.
+    // Formatos serializados comuns:
+    //   false_<remoto>_<idDaMensagem>
+    //   false_<remoto>_<idDaMensagem>_<participante>
+    //   true_<remoto>_<idDaMensagem>
+    // Em todos eles, o id da mensagem é o terceiro componente.
     const parts = serialized.split('_').filter(Boolean);
     if (parts.length >= 3) return parts[2];
     return serialized;
   }
 
   function exactKeyVariants(value) {
-    // Never split a full WhatsApp message id into arbitrary underscore-tail
-    // variants. Doing that can turn a participant/user id into a false match
-    // for an unrelated reply. Keep only the exact value.
+    // Nunca divide um id completo de mensagem em variantes pelo sublinhado: isso
+    // poderia transformar o id de um participante em falsa correspondência com
+    // uma resposta sem relação. Apenas o valor exato é mantido.
     const keys = new Set();
     const direct = candidateString(value);
     if (direct) keys.add(direct);
@@ -734,9 +765,9 @@
 
   function normalizeFilenameForCompare(value) {
     let s = String(value || '').normalize('NFKC').trim().replace(/\\/g, '/').split('/').pop().toLowerCase();
-    // A few WhatsApp/Web builds expose the same document extension twice
-    // between `body`, `title`, and `filename`. Collapse repeated known
-    // document extensions so the filename metadata is still recognized.
+    // Algumas versões do WhatsApp Web repetem a extensão do documento entre
+    // `body`, `title` e `filename`. Extensões repetidas conhecidas são unificadas
+    // para que o nome do arquivo continue sendo reconhecido.
     for (let i = 0; i < 3; i++) {
       const before = s;
       s = s.replace(/\.(pdf|docx?|xlsx?|pptx?|zip|rar|7z|csv)(?:\.(?:pdf|docx?|xlsx?|pptx?|zip|rar|7z|csv))+$/i, '.$1');
@@ -753,25 +784,25 @@
     return candidates.some(v => normalizeFilenameForCompare(v) === bodyNorm);
   }
 
-  // IMPORTANT: for documents, WhatsApp may expose the document filename in
-  // `caption` OR `body` even though the user did not write a caption. That
-  // filename must never be promoted into the caption suffix. Only an explicit
-  // caption that differs from all filename metadata counts.
+  // IMPORTANTE: em documentos, o WhatsApp pode expor o nome do arquivo em
+  // `caption` OU em `body`, mesmo sem legenda escrita pelo usuário. Esse nome
+  // nunca pode virar sufixo de legenda. Só conta uma legenda explícita que
+  // seja diferente de todos os metadados de nome de arquivo.
   function getOwnMediaCaption(m) {
     if (!m || !isMediaMessage(m)) return '';
 
     const kind = String(safeRead(m, 'type') || safeRead(m, 'mediaType') || '').toLowerCase();
     const filenameCandidates = mediaFilenameCandidates(m);
 
-    // Explicit caption fields are authoritative, except when WhatsApp has
-    // populated them with the document's own filename metadata.
+    // Campos explícitos de legenda têm prioridade, exceto quando o WhatsApp os
+    // preencheu com o próprio nome do documento.
     for (const key of ['caption', '__x_caption', 'mediaCaption', '__x_mediaCaption']) {
       const value = safeRead(m, key);
       if (typeof value !== 'string' || !value.trim()) continue;
       const clean = value.trim();
       if (isDocumentFilenameMetadata(clean, m, kind)) continue;
-      // For document-like media, also reject a filename-shaped caption that
-      // exactly matches the known title/name even if the carrier differs.
+      // Em documentos, também rejeita uma legenda com formato de nome de arquivo
+      // idêntica ao título/nome conhecido, mesmo vinda de outro campo.
       if (kind === 'document' && filenameCandidates.length && filenameCandidates.some(v => normalizeFilenameForCompare(v) === normalizeFilenameForCompare(clean))) continue;
       return clean;
     }
@@ -780,16 +811,16 @@
     if (typeof body !== 'string' || !body.trim()) return '';
     const cleanBody = body.trim();
 
-    // If body is the document's filename, it is metadata, not a user caption.
+    // Se o corpo é o nome do documento, trata-se de metadado, e não de legenda.
     if (filenameCandidates.some(v => normalizedCompareText(v) === normalizedCompareText(cleanBody))) return '';
     if (isDocumentFilenameMetadata(cleanBody, m, kind)) return '';
 
-    // For documents, do not fall back to arbitrary filename-looking body text
-    // when WhatsApp has supplied no reliable caption field. A caption such as
-    // "Pessoal Maria" is still accepted; the document filename is not.
+    // Em documentos, não usa um corpo com formato de nome de arquivo quando o
+    // WhatsApp não forneceu um campo de legenda confiável. Uma legenda como
+    // "Documentos do mês" continua aceita; o nome do arquivo, não.
     if (kind === 'document' && /\.[a-z0-9]{1,8}$/i.test(cleanBody)) return '';
 
-    // For images/video/audio/stickers, some builds put the real caption in body.
+    // Em imagens, vídeos, áudios e figurinhas, algumas versões guardam a legenda real em body.
     return cleanBody;
   }
 
@@ -805,26 +836,26 @@
     const kind = String(safeRead(m, 'type') || safeRead(m, 'mediaType') || '').toLowerCase();
     if (safeRead(m, 'isNotification') || safeRead(m, 'isEvent') || safeRead(m, 'isNotificationMessage')) return false;
 
-    // WhatsApp/wa-js has used several names for ordinary text messages across
-    // Web builds (chat, extendedTextMessage, conversation, etc.). Do not limit
-    // caption recovery to three historical type strings. Instead reject known
-    // system/non-user message classes and require actual text.
+    // O WhatsApp/wa-js usou vários nomes para mensagens de texto comuns (chat,
+    // extendedTextMessage, conversation etc.). Em vez de limitar a recuperação a
+    // alguns nomes históricos, são rejeitadas as classes de sistema conhecidas e
+    // exige-se texto real.
     const systemType = /(notification|protocol|revoked|ciphertext|call[_-]?log|e2e|group[_-]?notification|reaction|status|live[_-]?location)/i;
     if (kind && systemType.test(kind)) return false;
     return !!messageText(m);
   }
 
-  // --- Link message support -------------------------------------------------
-  // A link item is a non-media chat message containing one or more URLs.
-  // It is exported as a UTF-8 .txt file; the first URL is also included in
-  // the filename in a Windows-safe, human-readable form.
+  // --- Suporte a mensagens com links -------------------------------------------
+  // Um item de link é uma mensagem sem mídia que contém um ou mais endereços.
+  // É exportado como arquivo .txt em UTF-8; o primeiro endereço também entra no
+  // nome do arquivo, em forma legível e compatível com o Windows.
   const URL_RE = /https?:\/\/[^\s<>\"'`]+|www\.[^\s<>\"'`]+/gi;
 
   function normalizeLinkCandidate(raw) {
     if (typeof raw !== 'string') return '';
     let value = raw.trim();
     if (!value) return '';
-    // Remove punctuation that commonly wraps a URL in ordinary prose.
+    // Remove a pontuação que costuma acompanhar um endereço em textos comuns.
     value = value.replace(/[.,!?;:]+$/g, '');
     while (/[)\]}]$/.test(value)) {
       const last = value[value.length - 1];
@@ -870,11 +901,10 @@
     }
   }
 
-  // DOM link cache: some WhatsApp Web builds render a clickable URL in the
-  // message bubble but do not expose the URL in the wa-js message object. We
-  // cache DOM-discovered links by the exact serialized message id. Because the
-  // serialized id includes the chat/session context, this avoids leaking links
-  // between chats.
+  // Cache de links do DOM: algumas versões do WhatsApp Web exibem um link
+  // clicável no balão, mas não o expõem no objeto de mensagem do wa-js. Os
+  // links encontrados no DOM são guardados pelo id serializado exato da
+  // mensagem; como esse id inclui a conversa, não há mistura entre conversas.
   const DOM_LINK_CACHE = new Map();
 
   function domMessageIdsFromNode(node) {
@@ -975,8 +1005,8 @@
       const found = (serialized && index.bySerialized.get(serialized)) || (stanza && index.byStanza.get(stanza)) || null;
       for (const node of found ? [found] : []) {
 
-        // The URL can be rendered by WhatsApp as an actual anchor even when
-        // the message model does not expose body/urlText/linkPreview fields.
+        // O WhatsApp pode exibir o endereço como link real mesmo quando o modelo da
+        // mensagem não expõe os campos body/urlText/linkPreview.
         const anchors = node.querySelectorAll ? node.querySelectorAll('a[href]') : [];
         for (const a of anchors) {
           const href = a?.getAttribute?.('href') || a?.href || '';
@@ -991,7 +1021,7 @@
           }
         }
 
-        // Some link previews render selectable URL text without an <a> node.
+        // Algumas prévias de link exibem o endereço como texto, sem elemento <a>.
         addUrlsFromText(node.textContent || '', out);
         break;
       }
@@ -1003,8 +1033,8 @@
   function extractMessageLinks(m) {
     const out = [];
     addUrlsFromText(messageText(m), out);
-    // The DOM cache is populated from currently rendered message bubbles and
-    // survives virtualized-list movement so links can still be associated later.
+    // O cache do DOM é preenchido a partir dos balões exibidos e sobrevive à
+    // rolagem da lista virtualizada, mantendo a associação dos links.
     getCachedDomLinksForMessage(m, out);
     const scalarKeys = [
       'urlText', 'url', 'canonicalUrl', 'matchedText', 'href', 'link', 'sourceUrl',
@@ -1018,8 +1048,8 @@
       addUrlsFromObject(safeRead(m, key), out);
     }
 
-    // Fallback for WhatsApp Web builds where the link is visible in the chat
-    // (and clickable) but the WPP message object does not expose any URL field.
+    // Alternativa para versões do WhatsApp Web em que o link aparece (clicável)
+    // na conversa, mas o objeto de mensagem do WPP não expõe nenhum campo de URL.
     if (!out.length) {
       collectDomLinkCache();
       getCachedDomLinksForMessage(m, out);
@@ -1032,9 +1062,9 @@
     if (!m) return false;
     if (safeRead(m, 'isNotification') || safeRead(m, 'isEvent') || safeRead(m, 'isNotificationMessage')) return false;
     const kind = String(safeRead(m, 'type') || safeRead(m, 'mediaType') || '').toLowerCase();
-    // A real downloadable media item stays a media item even when its caption
-    // itself contains a URL. Link-only exports are ordinary text/link-preview
-    // messages, not image/video/audio/document/sticker items.
+    // Uma mídia baixável continua sendo mídia mesmo que a legenda contenha um
+    // endereço. Itens de link são mensagens de texto ou de prévia de link, e não
+    // imagens, vídeos, áudios, documentos ou figurinhas.
     const mediaKinds = ['image', 'video', 'ptt', 'audio', 'document', 'sticker'];
     if (mediaKinds.includes(kind)) return false;
     const urls = extractMessageLinks(m);
@@ -1043,9 +1073,9 @@
 
   function linkFilenamePart(url) {
     if (!url) return 'link';
-    // Preserve the complete URL concept while converting Windows-forbidden
-    // characters into underscores. Keep enough path/query to distinguish
-    // different viewing links, but cap the filename contribution.
+    // Preserva a ideia do endereço completo, trocando os caracteres proibidos no
+    // Windows por sublinhados. Mantém caminho e parâmetros suficientes para
+    // distinguir links diferentes, mas limita o tamanho no nome do arquivo.
     return sanitizeFilename(url).slice(0, 140) || 'link';
   }
 
@@ -1075,16 +1105,16 @@
   function normalizeEpochSeconds(value) {
     const n = Number(value);
     if (!Number.isFinite(n) || n <= 0) return 0;
-    // wa-js normally exposes seconds, but some builds/objects can surface
-    // milliseconds. Normalize both so ordering and filename dates use the
-    // same timeline.
+    // O wa-js normalmente usa segundos, mas alguns objetos usam milissegundos.
+    // Ambos são normalizados para que a ordenação e as datas nos nomes usem a
+    // mesma linha do tempo.
     return n > 100000000000 ? Math.floor(n / 1000) : Math.floor(n);
   }
 
   function messageTimestamp(m) {
     const t = normalizeEpochSeconds(safeRead(m, 't'));
     const timestamp = normalizeEpochSeconds(safeRead(m, 'timestamp'));
-    // Prefer the native WhatsApp `t` field when it is a plausible epoch.
+    // Prefere o campo nativo `t` do WhatsApp quando ele é uma data plausível.
     if (t >= 946684800 && t <= 4102444800) return t;
     if (timestamp >= 946684800 && timestamp <= 4102444800) return timestamp;
     return t || timestamp || 0;
@@ -1123,30 +1153,29 @@
   }
 
   function compareMessages(a, b) {
-    // Chronological order is based on the actual message timestamp first.
-    // rowId/sequence can reflect storage/insertion details that do not match
-    // the date shown in the chat, so they must never move a July message after
-    // an August message simply because their store ids are larger.
+    // A ordem cronológica usa primeiro o horário real da mensagem. rowId e
+    // sequence podem refletir detalhes de armazenamento que não correspondem à
+    // data exibida; por isso, nunca colocam uma mensagem de julho depois de uma
+    // de agosto apenas por terem números maiores.
     const at = messageTimestamp(a), bt = messageTimestamp(b);
     if (at !== bt) return at - bt;
 
-    // When two messages share the same second, prefer the actual displayed chat
-    // order when those messages are currently present in WhatsApp's DOM. This
-    // handles the common case where a media and its next text message both show
-    // the same minute/second in the UI.
+    // Quando duas mensagens têm o mesmo segundo, prefere a ordem exibida na
+    // conversa, se ambas estiverem no DOM do WhatsApp. Isso resolve o caso comum
+    // de uma mídia e o texto seguinte mostrarem o mesmo horário.
     const ad = Number(safeRead(a, '__wamdDomOrder'));
     const bd = Number(safeRead(b, '__wamdDomOrder'));
     if (Number.isFinite(ad) && Number.isFinite(bd) && ad !== bd) return ad - bd;
 
-    // Then use wa-js ordering metadata as a tie-breaker.
+    // Em seguida, usa os metadados de ordem do wa-js como desempate.
     const as = numericSequence(a), bs = numericSequence(b);
     if (as != null && bs != null && as !== bs) return as - bs;
 
     const ar = numericRowId(a), br = numericRowId(b);
     if (ar != null && br != null && ar !== br) return ar - br;
 
-    // Final stable fallback: preserve the order in which the messages entered
-    // the scanner context. Never use message IDs lexicographically.
+    // Último critério estável: a ordem em que as mensagens entraram na varredura.
+    // Os ids de mensagem nunca são comparados como texto.
     const ao = Number(safeRead(a, '__wamdContextOrdinal'));
     const bo = Number(safeRead(b, '__wamdContextOrdinal'));
     if (Number.isFinite(ao) && Number.isFinite(bo) && ao !== bo) return ao - bo;
@@ -1170,15 +1199,15 @@
     if (!mediaTs || !nextTs || nextTs < mediaTs) return false;
     if (nextTs - mediaTs > STANDALONE_CAPTION_MAX_GAP_SECONDS) return false;
 
-    // The candidate must literally be the next item in the chronological chat
-    // sequence assembled from the complete scanned context. This prevents a
-    // later message from being attached merely because no closer timestamp was
-    // found in a previous batch.
+    // A candidata precisa ser literalmente o próximo item da sequência
+    // cronológica montada com todo o contexto lido. Isso impede que uma mensagem
+    // posterior seja anexada apenas porque nenhum horário mais próximo foi
+    // encontrado em um lote anterior.
     if (!Array.isArray(ordered) || mediaIndex == null) return false;
     if (ordered[mediaIndex + 1] !== next) return false;
 
-    // If both messages have the same timestamp, require a reliable tie breaker.
-    // Prefer WhatsApp's displayed DOM order, then sequence/rowId. Never guess.
+    // Com horários idênticos, exige um desempate confiável: primeiro a ordem na
+    // tela do WhatsApp; depois sequence/rowId. Nunca há suposição.
     if (mediaTs === nextTs) {
       const mediaDom = Number(safeRead(media, '__wamdDomOrder'));
       const nextDom = Number(safeRead(next, '__wamdDomOrder'));
@@ -1220,8 +1249,8 @@
     const indexById = new Map(ordered.map((m, i) => [msgSerializedId(m), i]));
     const usedCaptionMessageIds = new Set();
 
-    // Start clean. An absent caption must stay absent; never inherit text from
-    // another media or another point in the conversation.
+    // Começa do zero: uma legenda ausente continua ausente e nunca herda texto
+    // de outra mídia ou de outro ponto da conversa.
     for (const media of mediaMessages) {
       const inline = getOwnMediaCaption(media);
       if (inline) {
@@ -1234,8 +1263,8 @@
       }
     }
 
-    // Explicit replies are stronger evidence than proximity. Only use a reply
-    // when WhatsApp exposes an exact quoted-message reference to this media.
+    // Respostas explícitas são evidência mais forte que a proximidade. Só são
+    // usadas quando o WhatsApp expõe uma referência exata a esta mídia.
     if (captureReplies) {
       // Índice construído uma única vez: id citado -> respostas de texto puro.
       // Antes, cada mídia percorria o histórico inteiro (O(mídias × mensagens)).
@@ -1282,12 +1311,12 @@
         media.__wamdCaptionSource = 'reply';
         media.__wamdCaptionMessageId = replyId;
         usedCaptionMessageIds.add(replyId);
-        log(`Caption matched: exact direct reply -> ${msgSerializedId(media)}`);
+        log(`Legenda associada por resposta direta exata -> ${msgSerializedId(media)}`);
       }
     }
 
-    // Then consider the literal next message in chronological chat order. The
-    // candidate must be at index + 1; we never search farther ahead.
+    // Depois, considera a mensagem literalmente seguinte na ordem cronológica.
+    // A candidata precisa estar no índice + 1; nunca se procura adiante.
     if (captureNext) {
       for (const media of mediaMessages) {
         if (media.__wamdCaption) continue;
@@ -1300,8 +1329,8 @@
         if (!nextId || usedCaptionMessageIds.has(nextId)) continue;
         const text = messageText(next);
         if (!text) continue;
-        // A standalone text message is allowed only as literal prose. If it is
-        // actually a duplicate of the media's filename metadata, do not attach it.
+        // Uma mensagem de texto avulsa só é aceita como texto livre. Se repetir o
+        // nome do arquivo da mídia, não é anexada.
         if (isDocumentFilenameMetadata(text, media, String(safeRead(media, 'type') || safeRead(media, 'mediaType') || '').toLowerCase())) continue;
 
         if (!isStrictlyNextMessage(media, next, ordered, mediaIndex)) continue;
@@ -1311,18 +1340,18 @@
         media.__wamdCaptionSource = 'standalone-next';
         media.__wamdCaptionMessageId = nextId;
         usedCaptionMessageIds.add(nextId);
-        log(`Caption matched: literal immediate next message -> ${msgSerializedId(media)}`);
+        log(`Legenda associada pela mensagem imediatamente seguinte -> ${msgSerializedId(media)}`);
       }
     }
   }
 
 
-  // Link messages are discovered from the same paginated chat history as media.
-  // This keeps chat/date scoping identical for all export types and avoids
-  // WA-JS builds where media:'url' returns empty or inconsistent results.
+  // As mensagens com links vêm do mesmo histórico paginado das mídias, o que
+  // mantém o mesmo recorte de conversa e de datas para todos os tipos e evita
+  // versões do wa-js em que media:'url' retorna vazio ou inconsistente.
 
-  // Page backwards through chat history collecting media messages that match
-  // the requested types/date range.
+  // Percorre o histórico da conversa de trás para frente, reunindo as mensagens
+  // que atendem aos tipos e ao intervalo de datas pedidos.
   async function fetchMediaMessages({ chatId, types, from, to, captureNextMessageCaption = false, captureReplyCaption = false, estimatedBatch = 200, maxBatches = 20 }) {
     const contextMessages = [];
     const seenIds = new Set();
@@ -1333,7 +1362,7 @@
     let sameAnchorRepeats = 0;
     let didOpenChat = false;
 
-    log(`Scanning "${chatId}" for media (types=[${[...wanted].join(',')}])...`);
+    log(`Analisando a conversa "${chatId}" (tipos: ${[...wanted].join(', ') || 'todos'})…`);
 
     const msgId = (m) => {
       if (typeof m === 'string') return m;
@@ -1342,10 +1371,9 @@
     };
     const msgTs = (m) => messageTimestamp(m);
 
-    // IMPORTANT: Keep the complete scanned message context. We intentionally do
-    // not filter to media during pagination because the text immediately after
-    // a media may be needed as a caption, including when it lands in the next
-    // pagination batch.
+    // IMPORTANTE: todo o contexto lido é mantido. As mensagens não são filtradas
+    // durante a paginação, porque o texto logo após uma mídia pode ser a sua
+    // legenda, inclusive quando cai no lote seguinte.
     while (batchNo < maxBatches) {
       batchNo++;
 
@@ -1360,7 +1388,7 @@
       try {
         batch = await window.WPP.chat.getMessages(chatId, opts);
       } catch (e) {
-        log(`getMessages() error on batch #${batchNo}: ${e?.message || e}`);
+        log(`getMessages(): erro no lote nº ${batchNo}: ${e?.message || e}`);
         break;
       }
 
@@ -1391,10 +1419,10 @@
             seenIds.clear();
             noNewRepeats = 0;
             sameAnchorRepeats = 0;
-            log('Chat was not initialized yet, opened it and restarted the scan');
+            log('A conversa ainda não estava inicializada; ela foi aberta e a análise foi reiniciada.');
             continue;
           } catch (e) {
-            log('openChat* failed while scanning: ' + (e?.message || e));
+            log('Falha ao abrir a conversa durante a análise: ' + (e?.message || e));
           }
         }
       }
@@ -1405,9 +1433,9 @@
       }
 
       contextMessages.push(...batch);
-      // Virtualized WhatsApp lists replace DOM rows while history is loaded.
-      // Cache visible link anchors on every batch so links remain associated
-      // with their original message even after the row scrolls away.
+      // A lista virtualizada do WhatsApp troca as linhas do DOM enquanto carrega o
+      // histórico. Os links visíveis são registrados a cada lote, para continuarem
+      // associados à mensagem original depois que a linha sai da tela.
       collectDomLinkCache(true);
 
       let newIdsInBatch = 0;
@@ -1418,8 +1446,8 @@
         seenIds.add(id);
       }
 
-      // Always page by the oldest timestamp seen in this batch. The returned
-      // array itself is not trusted to be chronologically sorted.
+      // A paginação usa sempre o horário mais antigo deste lote, pois a ordem do
+      // vetor retornado não é confiável.
       let cursorMsg = batch[0];
       let cursorTs = msgTs(cursorMsg);
       for (const x of batch) {
@@ -1453,16 +1481,16 @@
       }
     }
 
-    // Links use the same complete selected-chat history already collected above.
-    // They are identified after canonical ordering so chat/date filters and
-    // numbering remain identical to media.
+    // Os links usam o mesmo histórico completo reunido acima e são identificados
+    // depois da ordenação canônica, para que filtros e numeração sejam idênticos
+    // aos das mídias.
 
-    // Capture any links visible in the final loaded portion before ordering.
+    // Registra os links visíveis na última parte carregada antes de ordenar.
     collectDomLinkCache(true);
 
-    // -------------------- Canonical chat order --------------------
-    // Build ONE ordered timeline before filtering media, matching captions, or
-    // assigning file numbers. This is the source of truth for all later work.
+    // -------------------- Ordem canônica do chat --------------------
+    // Monta UMA linha do tempo ordenada antes de filtrar mídias, associar legendas
+    // ou numerar arquivos. Ela é a referência para todo o trabalho seguinte.
     const unique = new Map();
     let contextOrdinal = 0;
     for (const m of contextMessages) {
@@ -1478,9 +1506,8 @@
 
     const contextArray = [...unique.values()]
       .filter(m => messageTimestamp(m) > 0);
-    // Use visible WhatsApp DOM order as the strongest tie-breaker for messages
-    // that share the same second. This is especially useful for media + caption
-    // text that render with the same timestamp.
+    // A ordem visível no DOM do WhatsApp é o desempate mais forte para mensagens
+    // do mesmo segundo, especialmente mídia e legenda exibidas com o mesmo horário.
     assignDomOrder(contextArray);
     const orderedContext = contextArray.sort(compareMessages);
 
@@ -1492,9 +1519,9 @@
       }
     });
 
-    // Derive the export list FROM the already-sorted timeline. Nothing gets a
-    // file number before this point, so numbering cannot be split by batches or
-    // download completion timing.
+    // A lista de exportação é derivada da linha do tempo já ordenada. Nenhum item
+    // recebe número antes deste ponto; assim, a numeração não depende dos lotes
+    // nem da ordem de término dos downloads.
     const mediaMessages = orderedContext.filter(m => {
       if (!isMediaMessage(m)) return false;
       const ts = messageTimestamp(m);
@@ -1504,7 +1531,7 @@
       return !(wanted.size && !wanted.has(norm) && !(wanted.has('ptt') && kind === 'ptt'));
     });
 
-    log(`Chronological order fixed before caption matching/download: ${mediaMessages.length} media file(s).`);
+    log(`Ordem cronológica definida antes das legendas e dos downloads: ${mediaMessages.length} mídia(s).`);
 
     if (captureNextMessageCaption || captureReplyCaption) {
       attachRecoveredCaptions(mediaMessages, orderedContext, from, to, {
@@ -1517,8 +1544,8 @@
     const wantLinks = wanted.has('link');
     const linkMessages = !wantLinks ? [] : orderedContext.filter(m => {
       if (!isLinkMessage(m)) return false;
-      // Links must belong to the explicitly selected chat. The context was
-      // collected from this chat, and we still enforce the exact chat id here.
+      // Os links precisam pertencer à conversa selecionada. O contexto já veio
+      // dela, e o id exato da conversa é conferido mesmo assim.
       if (messageChatKey(m) !== chatId) return false;
       if (captionSourceIds.has(msgSerializedId(m))) return false;
       const ts = messageTimestamp(m);
@@ -1526,8 +1553,8 @@
       return wanted.has('link');
     });
 
-    // Links and media share ONE chronological export sequence. This makes
-    // 0001, 0002, 0003... represent the actual order of selected items in the chat.
+    // Links e mídias compartilham UMA sequência cronológica de exportação; assim,
+    // 0001, 0002, 0003... representam a ordem real dos itens na conversa.
     const linkSet = new Set(linkMessages);
     const exportItems = [...mediaMessages, ...linkMessages].sort(compareMessages);
     exportItems.forEach((m, i) => {
@@ -1539,8 +1566,8 @@
     });
 
     const recovered = mediaMessages.filter(m => !!m.__wamdCaption).length;
-    if (recovered) log(`Recovered ${recovered} caption(s) from media, next messages, or direct replies.`);
-    log(`Scan complete, ${exportItems.length} export item(s): ${mediaMessages.length} media + ${linkMessages.length} link(s)`);
+    if (recovered) log(`${recovered} legenda(s) recuperada(s) da própria mídia, de respostas diretas ou da mensagem seguinte.`);
+    log(`Análise concluída: ${exportItems.length} item(ns) para exportar (${mediaMessages.length} mídia(s) e ${linkMessages.length} link(s)).`);
     return exportItems;
   }
 
@@ -1552,9 +1579,9 @@
       return msg?.mediaData || msg?._mediaData || null;
     }
 
-    // Some WhatsApp Web builds ship a broken forceToBlob() that throws on
-    // msgChunks instead of returning null; neutralize it so a single bad
-    // cached blob can't take down the whole batch.
+    // Algumas versões do WhatsApp Web têm um forceToBlob() defeituoso, que lança
+    // erro em msgChunks em vez de retornar null. Ele é neutralizado para que um
+    // único blob com problema não derrube o lote inteiro.
     function neutralizeBrokenBlob(msg) {
       const md = getMediaData(msg);
       if (!md) return;
@@ -1683,11 +1710,10 @@
 
       try { if (md?.mediaBlob) md.mediaBlob = null; } catch {}
 
-      // Force a real fetch rather than reading whatever is cached. WhatsApp
-      // Web can hold a low resolution preview blob in memory before the full
-      // quality original has been fetched, so taking the cached blob saves
-      // images and videos at reduced quality. Calling downloadMedia() again
-      // is cheap when the full file is already present.
+      // Força uma busca real em vez de usar o que estiver em cache. O WhatsApp Web
+      // pode manter na memória uma prévia em baixa resolução antes de obter o
+      // original; usar esse blob salvaria imagens e vídeos com qualidade reduzida.
+      // Chamar downloadMedia() novamente é barato quando o arquivo já está presente.
       await message.downloadMedia({ downloadEvenIfExpensive: true, rmrReason: 1, isUserInitiated: true });
       await new Promise(r => setTimeout(r, 250));
 
@@ -1698,10 +1724,10 @@
       blob = await getBlobFromMessageCaches(message, id);
       if (blob) return blob;
 
-      throw new Error(`message.downloadMedia() completed but no blob was cached for ${id}`);
+      throw new Error(`message.downloadMedia() terminou, mas nenhum arquivo ficou em cache para ${id}`);
     }
 
-    // Fallback: the lower-level WPP.chat API.
+    // Alternativa: a API de nível mais baixo, WPP.chat.
     if (!dlFnName) {
       if (typeof W.downloadMediaMessage === 'function') dlFnName = 'downloadMediaMessage(message)';
       else if (typeof W.downloadMedia === 'function') dlFnName = 'downloadMedia(id)';
@@ -1713,7 +1739,7 @@
     if (dlFnName === 'downloadMedia(id)') return await W.downloadMedia(id);
     if (dlFnName === 'downloadMessage(id)') return await W.downloadMessage(id);
 
-    throw new Error('No downloadMedia* API available in this WhatsApp Web build');
+    throw new Error('Nenhuma API de download de mídia está disponível nesta versão do WhatsApp Web');
   }
 
   async function safeDownloadBlob(m, { timeoutMs = 45000, retries = 1 } = {}) {
@@ -1724,13 +1750,13 @@
       try {
         const blob = await withTimeout(downloadAnyMedia(m), timeoutMs, `downloadAnyMedia kind=${kind} id=${mid} attempt=${attempt}`);
 
-        if (!blob || typeof blob.arrayBuffer !== 'function') throw new Error('download returned an invalid blob');
-        if (typeof blob.size === 'number' && blob.size === 0) throw new Error('blob size = 0 (media not available)');
+        if (!blob || typeof blob.arrayBuffer !== 'function') throw new Error('o download retornou um arquivo inválido');
+        if (typeof blob.size === 'number' && blob.size === 0) throw new Error('arquivo vazio (mídia indisponível)');
 
         return blob;
       } catch (e) {
         if (attempt > retries) {
-          log(`SKIP: id=${mid}, kind=${kind} -> ${e?.message || e}`);
+          log(`Ignorado: id=${mid}, tipo=${kind} -> ${e?.message || e}`);
         }
         if (attempt <= retries) await new Promise(r => setTimeout(r, 400));
       }
@@ -1739,18 +1765,18 @@
     return null;
   }
 
-  // --- Extension-driven download bridge -----------------------------------
-  // Sends the finished file to content.js -> background.js, which saves it
-  // via chrome.downloads.download(). Routing saves through the extension
-  // (instead of clicking an <a download> here in the page) avoids Chrome's
-  // "this site is trying to download multiple files" prompt, which only
-  // applies to page-initiated downloads, the real blocker to downloading
-  // many files in one go.
+  // --- Ponte de download pela extensão ---------------------------------------
+  // Envia o arquivo pronto para content.js -> background.js, que o salva com
+  // chrome.downloads.download(). Salvar pela extensão (e não clicando em um
+  // <a download> na página) evita o aviso do Chrome "este site está tentando
+  // baixar vários arquivos", que só vale para downloads iniciados pela página.
   let downloadSeq = 0;
   let downloadInProgress = false;
   const pendingDownloads = new Map();
 
   window.addEventListener('message', (ev) => {
+    // Aceita apenas mensagens da própria janela (nunca de iframes).
+    if (ev.source && ev.source !== window) return;
     const { data } = ev;
     if (!data || data.__from !== 'wamd:content' || data.type !== 'wa:download:ack') return;
     const pending = pendingDownloads.get(data.id);
@@ -1777,7 +1803,7 @@
 
       const timer = setTimeout(() => {
         pendingDownloads.delete(id);
-        resolve({ ok: false, error: 'download ack timeout' });
+        resolve({ ok: false, error: 'a extensão não confirmou o salvamento a tempo' });
       }, timeoutMs);
 
       pendingDownloads.set(id, { resolve, timer });
@@ -1791,14 +1817,13 @@
     });
   }
 
-  // A whole-chat ZIP routinely runs to hundreds of megabytes. Base64 for the
-  // extension bridge inflates that by a third and has to hold it as one
-  // string, which passes the engine's maximum string length and throws
-  // "Invalid string length", losing the entire batch at the last step. Hand
-  // the blob to an anchor instead. This is a page-initiated download, but it
-  // is a single file, so Chrome's multiple-download prompt does not apply.
-  // Chrome strips directories from the download attribute, so the ZIP lands
-  // in the Downloads root rather than a subfolder.
+  // Um ZIP de conversa inteira chega facilmente a centenas de megabytes. O base64
+  // da ponte da extensão aumenta o tamanho em um terço e exige uma única string,
+  // o que ultrapassa o limite do motor JavaScript ("Invalid string length").
+  // Por isso, o blob é entregue a um link na própria página. É um download
+  // iniciado pela página, mas de um único arquivo, então o aviso de vários
+  // downloads não se aplica. O Chrome ignora pastas no atributo download; por
+  // isso, o arquivo é salvo na raiz da pasta Downloads.
   function saveBlobFromPage(blob, filename) {
     const url = URL.createObjectURL(blob);
     try {
@@ -1821,15 +1846,15 @@
     try {
       const res = await requestDownload({ arrayBuffer, filename, mime });
       if (res?.ok) return { ok: true };
-      log(`Save failed: ${filename}, ${res?.error || 'unknown error'}`);
-      return { ok: false, error: res?.error || 'unknown error' };
+      log(`Falha ao salvar: ${filename}, ${res?.error || 'erro desconhecido'}`);
+      return { ok: false, error: res?.error || 'erro desconhecido' };
     } catch (e) {
-      log(`Save failed: ${filename}, ${e?.message || e}`);
+      log(`Falha ao salvar: ${filename}, ${e?.message || e}`);
       return { ok: false, error: String(e?.message || e) };
     }
   }
 
-  // --- Minimal ZIP (STORE, uncompressed) writer ---
+  // --- Gerador de ZIP mínimo (STORE, sem compressão) ---
   const crcTable = (function () {
     const t = new Uint32Array(256);
     for (let i = 0; i < 256; i++) {
@@ -1883,7 +1908,7 @@
     return concat([u32(0x06054b50), u16(0), u16(0), u16(count), u16(count), u32(cdSize), u32(cdOffset), u16(0)]);
   }
 
-  async function makeZip(entries) {
+  function makeZip(entries) {
     const locals = [];
     const centrals = [];
     let offset = 0;
@@ -1892,21 +1917,22 @@
       const nameBytes = strToUtf8Bytes(e.name);
       const data = e.bytes instanceof Uint8Array ? e.bytes : new Uint8Array(e.bytes);
       const crc = crc32(data);
-      const localRec = concat([writeLocalHeader(nameBytes, crc, data.length), data]);
-      locals.push(localRec);
+      const header = writeLocalHeader(nameBytes, crc, data.length);
+      // Cabeçalho e dados entram separados no Blob, sem cópia extra dos bytes.
+      locals.push(header, data);
       centrals.push(writeCentralHeader(nameBytes, crc, data.length, offset));
-      offset += localRec.length;
+      offset += header.length + data.length;
     }
 
     const cd = concat(centrals);
     const eocd = writeEOCD(entries.length, cd.length, offset);
-    return concat([...locals, cd, eocd]);
+    // Blob em partes: evita copiar todo o conteúdo para um único array.
+    return new Blob([...locals, cd, eocd], { type: 'application/zip' });
   }
 
-  // --- Bounded-concurrency pool ---
-  // Runs `worker` over `items` with at most `limit` in flight at once, so a
-  // "download everything" batch downloads several files in parallel instead
-  // of strictly one at a time, without spawning unbounded concurrent work.
+  // --- Fila com concorrência limitada ---
+  // Executa `worker` sobre `items` com no máximo `limit` tarefas simultâneas,
+  // baixando vários arquivos em paralelo sem criar trabalho ilimitado.
   async function runPool(items, worker, limit) {
     const size = Math.max(1, Math.min(Number(limit) || 4, 8));
     let cursor = 0;
@@ -1924,11 +1950,79 @@
     return results;
   }
 
+  // --- Limites de salvamento ---
+  // A troca de mensagens entre página e extensão aceita no máximo 64 MiB por
+  // mensagem; em base64 o arquivo cresce cerca de 33%. Acima deste limite o
+  // arquivo é salvo diretamente pela página.
+  const LIMITE_PONTE_BYTES = 40 * 1024 * 1024;
+  // Cada parte do ZIP fica abaixo de 1 GiB e de 65.000 itens (o formato ZIP
+  // sem ZIP64 aceita no máximo 4 GiB e 65.535 entradas).
+  const LIMITE_PARTE_ZIP_BYTES = 1024 * 1024 * 1024;
+  const LIMITE_ITENS_ZIP = 65000;
+  const PASTA_DOWNLOADS = 'WhatSave';
+
+  function formatarTamanho(bytes) {
+    const n = Number(bytes) || 0;
+    if (n >= 1024 * 1024 * 1024) return `${(n / (1024 * 1024 * 1024)).toFixed(2).replace('.', ',')} GB`;
+    if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
+    if (n >= 1024) return `${Math.round(n / 1024)} KB`;
+    return `${n} B`;
+  }
+
+  // --- Processamento em ordem com busca paralela ---
+  // `preparar` roda em paralelo (até `limite` ao mesmo tempo), mas `consumir`
+  // recebe os resultados estritamente na ordem dos itens. Os trabalhadores
+  // nunca ficam mais que uma janela à frente do consumo, o que limita a
+  // memória usada. Erros de um item não interrompem os demais.
+  async function processarEmOrdem(itens, preparar, consumir, limite, registrar = () => {}) {
+    const lista = Array.isArray(itens) ? itens : [];
+    const concorrencia = Math.max(1, Math.min(Number(limite) || 4, 8));
+    const janela = Math.max(concorrencia * 2, 4);
+    const prontos = new Map();
+    let proximoBuscar = 0;
+    let proximoConsumir = 0;
+    let esperando = [];
+    const avisar = () => { const l = esperando; esperando = []; for (const w of l) w(); };
+    const aguardar = () => new Promise(resolve => { esperando.push(resolve); });
+
+    const trabalhador = async () => {
+      for (;;) {
+        while (proximoBuscar < lista.length && proximoBuscar - proximoConsumir >= janela) {
+          await aguardar();
+        }
+        const i = proximoBuscar++;
+        if (i >= lista.length) return;
+        let resultado = null;
+        try { resultado = await preparar(lista[i], i); }
+        catch (e) { registrar(`Erro no item nº ${i + 1}: ${e?.message || e}`); }
+        prontos.set(i, resultado);
+        avisar();
+      }
+    };
+
+    const consumidor = async () => {
+      while (proximoConsumir < lista.length) {
+        if (!prontos.has(proximoConsumir)) { await aguardar(); continue; }
+        const resultado = prontos.get(proximoConsumir);
+        prontos.delete(proximoConsumir);
+        const i = proximoConsumir++;
+        try { await consumir(resultado, i); }
+        catch (e) { registrar(`Erro ao salvar o item nº ${i + 1}: ${e?.message || e}`); }
+        avisar();
+      }
+    };
+
+    await Promise.all([
+      consumidor(),
+      ...Array.from({ length: Math.min(concorrencia, lista.length) }, trabalhador)
+    ]);
+  }
+
   async function downloadMessages({ chatId, chatsFriendlyMap, types, from, to, naming, pack }) {
     await ensureReady();
 
     if (!chatId) {
-      log('No chat selected');
+      log('Nenhuma conversa selecionada.');
       return { count: 0 };
     }
 
@@ -1943,18 +2037,18 @@
     });
 
     if (!msgs.length) {
-      log('No matching media or links found for the selected filters.');
+      log('Nenhuma mídia ou link encontrado com os filtros selecionados.');
       return { count: 0 };
     }
 
-    // msgs is already sorted before we get here. Keep that order all the way
-    // into filename numbering and, when requested, into the actual save calls.
+    // msgs já chega ordenado. Essa ordem é mantida na numeração dos nomes e,
+    // quando solicitado, também nos salvamentos.
     const preserveChatOrder = pack?.preserveChatOrder !== false;
     if (preserveChatOrder) {
-      log('Preserving chat order: files will be numbered oldest → newest and saved in that same order.');
+      log('Ordem do chat preservada: os arquivos serão numerados do mais antigo para o mais recente e salvos nessa mesma ordem.');
     }
 
-    log(`Found ${msgs.length} export item(s). Fetching up to ${concurrency} at a time…`);
+    log(`${msgs.length} item(ns) encontrado(s). Buscando até ${concurrency} por vez…`);
 
     const chatName = chatsFriendlyMap.get(chatId) || 'Chat';
     const chatFolder = sanitizeFilename(chatName) || 'Chat';
@@ -1976,7 +2070,7 @@
       if (exportKind === 'link') {
         try {
           const links = extractMessageLinks(m);
-          if (!links.length) throw new Error('link item had no extractable URL');
+          if (!links.length) throw new Error('o item de link não tem endereço aproveitável');
           const senderName = naming?.includeSenderName ? await resolveSenderName(m) : '';
           const primary = links[0];
           const linkPart = linkFilenamePart(primary);
@@ -1999,28 +2093,28 @@
             datePart = `_${formats[naming?.dateFormat] || formats['YYYY-MM-DD_HH-mm-ss']}`;
           }
           const rawFilename = `${base}${senderPart}${datePart}_LINK_${linkPart}.txt`;
-          // Keep the final name safely below Windows' common 255-character limit
-          // without duplicating the extension when truncation is unnecessary.
+          // Mantém o nome final com folga abaixo do limite comum de 255 caracteres do
+          // Windows, sem duplicar a extensão quando o corte não é necessário.
           const filename = Array.from(rawFilename).length <= 200 ? rawFilename : `${finalizeFilenamePart(rawFilename, 196)}.txt`;
           const text = [
-            'WhatSave link export',
+            'WhatSave: exportação de link',
             '',
-            ...links.map(url => `Link: ${url}`),
+            ...links.map(url => `Endereço: ${url}`),
             ''
           ].join('\r\n');
           const bytes = strToUtf8Bytes(text);
           const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
           result = { filename, mime: 'text/plain;charset=utf-8', arrayBuffer, bytes };
         } catch (e) {
-          log(`error #${index}: link ${mid}, ${e?.message || e}`);
+          log(`Erro no item nº ${index}: link ${mid}, ${e?.message || e}`);
         }
       } else if (isProbablyUnavailableByMessage(m)) {
-        log(`skip #${index}: ${mid} (${kind}), media not fully available`);
+        log(`Item nº ${index} ignorado: ${mid} (${kind}), mídia não disponível por completo`);
       } else {
         try {
           const blob = await safeDownloadBlob(m, { timeoutMs: getTimeoutForMedia(m), retries: 1 });
           if (!blob) {
-            // safeDownloadBlob() already logged the reason.
+            // safeDownloadBlob() já registrou o motivo.
           } else {
             const arrayBuffer = await blob.arrayBuffer();
             const mime = blob.type || m.mimetype || 'application/octet-stream';
@@ -2032,7 +2126,7 @@
             result = { filename, mime, arrayBuffer, bytes: new Uint8Array(arrayBuffer) };
           }
         } catch (e) {
-          log(`error #${index}: ${mid}, ${e?.message || e}`);
+          log(`Erro no item nº ${index}: ${mid}, ${e?.message || e}`);
         }
       }
 
@@ -2041,98 +2135,92 @@
       return result;
     }
 
-    if (pack?.saveAsZip) {
-      const collected = await runPool(msgs, prepareEntry, concurrency);
-      const entries = collected.filter(Boolean).map(e => ({ name: e.filename, bytes: e.bytes }));
+    const pastaBase = `${PASTA_DOWNLOADS}/${chatFolder}`;
 
-      if (!entries.length) {
-        log('Nothing to zip. No media could be downloaded.');
+    // Salva um arquivo individual. Acima do limite de mensagens da extensão, o
+    // arquivo vai direto pela página (cai na raiz de Downloads, com o nome da
+    // conversa no início para continuar identificável).
+    const salvarIndividual = async (entry) => {
+      const tamanho = entry.arrayBuffer?.byteLength || 0;
+      if (tamanho > LIMITE_PONTE_BYTES) {
+        log(`Arquivo grande (${formatarTamanho(tamanho)}): salvando diretamente pela página, na pasta Downloads. ${entry.filename}`);
+        const res = saveBlobFromPage(new Blob([entry.arrayBuffer], { type: entry.mime || 'application/octet-stream' }), `${chatFolder}_${entry.filename}`);
+        if (!res.ok) log(`Falha ao salvar: ${entry.filename}, ${res.error}`);
+        return res.ok;
+      }
+      const ack = await postDownload({ arrayBuffer: entry.arrayBuffer, filename: `${pastaBase}/${entry.filename}`, mime: entry.mime });
+      return !!ack?.ok;
+    };
+
+    if (pack?.saveAsZip) {
+      // O ZIP é montado em partes, na ordem do chat. Cada parte respeita os
+      // limites do formato ZIP sem ZIP64 e é salva assim que fica cheia, para
+      // que a memória nunca precise guardar a conversa inteira de uma vez.
+      let parte = [];
+      let bytesParte = 0;
+      let numeroParte = 0;
+      let itensNoZip = 0;
+
+      const fecharParte = async (ultima) => {
+        if (!parte.length) return;
+        numeroParte++;
+        const sufixo = (ultima && numeroParte === 1) ? '' : `_parte${String(numeroParte).padStart(2, '0')}`;
+        const zipName = `${chatFolder}_WhatSave${sufixo}.zip`;
+        log(`Montando ${zipName} com ${parte.length} arquivo(s) (${formatarTamanho(bytesParte)})…`);
+        const blob = makeZip(parte);
+        const res = saveBlobFromPage(blob, zipName);
+        if (res.ok) itensNoZip += parte.length;
+        else log(`Falha ao salvar: ${zipName}, ${res.error}`);
+        parte = [];
+        bytesParte = 0;
+      };
+
+      await processarEmOrdem(msgs, prepareEntry, async (entry) => {
+        if (!entry) return;
+        const tamanho = entry.bytes?.length || 0;
+        if (parte.length && (bytesParte + tamanho > LIMITE_PARTE_ZIP_BYTES || parte.length >= LIMITE_ITENS_ZIP)) {
+          await fecharParte(false);
+        }
+        parte.push({ name: entry.filename, bytes: entry.bytes });
+        bytesParte += tamanho;
+      }, concurrency, log);
+      await fecharParte(true);
+
+      if (!numeroParte) {
+        log('Nenhum arquivo para compactar: nenhum item pôde ser baixado.');
         return { count: 0, zip: true };
       }
-
-      log(`Building ZIP with ${entries.length} file(s)…`);
-      const zipBytes = await makeZip(entries);
-      const zipName = `${chatFolder}_media.zip`;
-      const res = saveBlobFromPage(new Blob([zipBytes], { type: 'application/zip' }), zipName);
-      if (!res.ok) log(`Save failed: ${zipName}, ${res.error}`);
-      saved = res.ok ? entries.length : 0;
-      log(`Done. ${saved}/${total} item(s) exported to ZIP.`);
+      saved = itensNoZip;
+      log(`Concluído: ${saved}/${total} item(ns) exportado(s) em ${numeroParte} arquivo(s) ZIP.`);
       return { count: saved, zip: true };
     }
 
     if (preserveChatOrder) {
-      // Fetch/decrypt can stay parallel, but the final chrome.downloads calls
-      // are serialized. This makes the filesystem's creation/modified order
-      // follow the chat order instead of the race between parallel downloads.
-      // Janela deslizante: os workers buscam em paralelo, mas nunca ficam mais
-      // de `window` itens à frente do próximo arquivo a salvar. Assim a ordem é
-      // preservada sem manter todos os vídeos/arquivos na memória ao mesmo tempo.
-      const ready = new Map();
-      const windowSize = Math.max(concurrency * 2, 4);
-      let nextToFetch = 0;
-      let nextToSave = 0;
-      // Lista de quem está esperando: notify() acorda todos (workers e saver),
-      // então nenhum sinal se perde quando vários aguardam ao mesmo tempo.
-      let waiters = [];
-      const notify = () => { const list = waiters; waiters = []; for (const w of list) w(); };
-      const waitChange = () => new Promise(resolve => { waiters.push(resolve); });
-
-      const fetchWorker = async () => {
-        for (;;) {
-          while (nextToFetch < msgs.length && nextToFetch - nextToSave >= windowSize) {
-            await waitChange();
-          }
-          const i = nextToFetch++;
-          if (i >= msgs.length) return;
-          let entry = null;
-          try { entry = await prepareEntry(msgs[i], i); }
-          catch (e) { log(`error #${i + 1}: ${e?.message || e}`); }
-          ready.set(i, entry);
-          notify();
-        }
-      };
-
-      const saver = async () => {
-        while (nextToSave < msgs.length) {
-          if (!ready.has(nextToSave)) { await waitChange(); continue; }
-          const entry = ready.get(nextToSave);
-          ready.delete(nextToSave);
-          nextToSave++;
-          if (entry) {
-            const relPath = `WA Media Downloads/${chatFolder}/${entry.filename}`;
-            let ack = null;
-            try { ack = await postDownload({ arrayBuffer: entry.arrayBuffer, filename: relPath, mime: entry.mime }); }
-            catch (e) { ack = { ok: false, error: e?.message || String(e) }; }
-            if (ack?.ok) saved++;
-            else log(`Save failed: ${entry.filename}${ack?.error ? `, ${ack.error}` : ''}`);
-            reportProgress();
-          }
-          notify();
-        }
-      };
-
-      await Promise.all([
-        saver(),
-        ...Array.from({ length: Math.min(concurrency, msgs.length) }, fetchWorker)
-      ]);
+      // A busca e a descriptografia continuam paralelas, mas os salvamentos
+      // acontecem um a um, na ordem do chat (janela deslizante limitada).
+      await processarEmOrdem(msgs, prepareEntry, async (entry) => {
+        if (!entry) return;
+        if (await salvarIndividual(entry)) saved++;
+        reportProgress();
+      }, concurrency, log);
     } else {
       await runPool(msgs, async (m, i) => {
-        const entry = await prepareEntry(m, i);
+        let entry = null;
+        try { entry = await prepareEntry(m, i); }
+        catch (e) { log(`Erro no item nº ${i + 1}: ${e?.message || e}`); }
         if (!entry) return;
-
-        const relPath = `WA Media Downloads/${chatFolder}/${entry.filename}`;
-        const ack = await postDownload({ arrayBuffer: entry.arrayBuffer, filename: relPath, mime: entry.mime });
-        if (ack?.ok) saved++;
+        if (await salvarIndividual(entry)) saved++;
         reportProgress();
       }, concurrency);
     }
 
-    log(`Done. ${saved}/${total} item(s) downloaded.`);
+    log(`Concluído: ${saved}/${total} item(ns) baixado(s).`);
     return { count: saved };
   }
 
-  // --- Command handler (popup -> content.js -> here) ---
+  // --- Tratamento de comandos (popup -> content.js -> aqui) ---
   window.addEventListener('message', async (ev) => {
+    if (ev.source && ev.source !== window) return;
     const { data } = ev;
     if (!data || data.__from !== 'wamd:inpage' || data.type !== 'popup:cmd') return;
 
@@ -2148,7 +2236,7 @@
       if (cmd === 'getStats') {
         const { selectedChatId } = payload || {};
         if (!selectedChatId) {
-          window.postMessage({ __from: 'wamd:inpage', type: 'inpage:error', cmd, error: 'Missing selectedChatId' }, '*');
+          window.postMessage({ __from: 'wamd:inpage', type: 'inpage:error', cmd, error: 'Nenhuma conversa informada' }, '*');
           return;
         }
         const stats = await getChatStats(selectedChatId);
@@ -2159,7 +2247,7 @@
       if (cmd === 'loadMore') {
         const { selectedChatId } = payload || {};
         if (!selectedChatId) {
-          window.postMessage({ __from: 'wamd:inpage', type: 'inpage:error', cmd, error: 'Missing selectedChatId' }, '*');
+          window.postMessage({ __from: 'wamd:inpage', type: 'inpage:error', cmd, error: 'Nenhuma conversa informada' }, '*');
           return;
         }
         const result = await loadMoreMessages(selectedChatId);
@@ -2172,15 +2260,15 @@
         const ids = Array.isArray(chatIds) ? chatIds.filter(Boolean) : [];
 
         if (!ids.length) {
-          window.postMessage({ __from: 'wamd:inpage', type: 'inpage:error', cmd, error: 'No chat selected' }, '*');
+          window.postMessage({ __from: 'wamd:inpage', type: 'inpage:error', cmd, error: 'Nenhuma conversa selecionada' }, '*');
           return;
         }
 
-        // Two runs over the same chat would fight over the same media and
-        // double the load on WhatsApp's servers, which is enough to push
-        // large videos past their download timeout.
+        // Duas execuções sobre a mesma conversa disputariam as mesmas mídias e
+        // dobrariam a carga nos servidores do WhatsApp, o suficiente para estourar o
+        // tempo limite de vídeos grandes.
         if (downloadInProgress) {
-          log('A download is already running. Wait for it to finish.');
+          log('Já existe uma exportação em andamento. Aguarde a conclusão.');
           return;
         }
         downloadInProgress = true;
@@ -2189,14 +2277,13 @@
           const chats = await listChats();
           const map = new Map(chats.map(c => [c.id, c.name]));
 
-          const from = dateFrom ? dayRangeToEpochSeconds(dateFrom).start : undefined;
-          const to = dateTo ? dayRangeToEpochSeconds(dateTo).end : undefined;
+          const { from, to } = intervaloDatas(dateFrom, dateTo);
 
           let totalCount = 0;
           for (let i = 0; i < ids.length; i++) {
             const chatId = ids[i];
             const chatName = map.get(chatId) || chatId;
-            if (ids.length > 1) log(`Chat ${i + 1}/${ids.length}: ${chatName}`);
+            if (ids.length > 1) log(`Conversa ${i + 1}/${ids.length}: ${chatName}`);
 
             const res = await downloadMessages({ chatId, chatsFriendlyMap: map, types, from, to, naming, pack });
             totalCount += res?.count || 0;
@@ -2212,14 +2299,14 @@
         return;
       }
 
-      window.postMessage({ __from: 'wamd:inpage', type: 'inpage:error', cmd, error: 'Unknown cmd' }, '*');
+      window.postMessage({ __from: 'wamd:inpage', type: 'inpage:error', cmd, error: 'Comando desconhecido' }, '*');
     } catch (e) {
       window.postMessage({ __from: 'wamd:inpage', type: 'inpage:error', cmd, error: String(e?.message || e) }, '*');
     }
   });
 
-  // Optional direct channel for use from the page's own devtools console,
-  // without going through content.js at all.
+  // Canal direto opcional, para uso pelo console de desenvolvedor da própria
+  // página, sem passar pelo content.js.
   window.__WAMD_DIRECT_CMD = async (cmd, payload) => {
     try {
       if (cmd === 'listChats') {
@@ -2229,12 +2316,11 @@
       if (cmd === 'download') {
         const { chatIds, selectedChatId, types, dateFrom, dateTo, naming, pack } = payload || {};
         const ids = Array.isArray(chatIds) ? chatIds.filter(Boolean) : (selectedChatId ? [selectedChatId] : []);
-        if (!ids.length) return { ok: false, error: 'Missing chatIds' };
+        if (!ids.length) return { ok: false, error: 'Nenhuma conversa informada' };
 
         const chats = await listChats();
         const map = new Map(chats.map(c => [c.id, c.name]));
-        const from = dateFrom ? dayRangeToEpochSeconds(dateFrom).start : undefined;
-        const to = dateTo ? dayRangeToEpochSeconds(dateTo).end : undefined;
+        const { from, to } = intervaloDatas(dateFrom, dateTo);
 
         let totalCount = 0;
         for (const chatId of ids) {
@@ -2244,9 +2330,24 @@
         return { ok: true, data: { count: totalCount, chats: ids.length } };
       }
 
-      return { ok: false, error: 'Unknown cmd' };
+      return { ok: false, error: 'Comando desconhecido' };
     } catch (e) {
       return { ok: false, error: String(e?.message || e) };
     }
   };
+
+  // Exposição das funções internas apenas para os testes automatizados
+  // (npm test). Na página real do WhatsApp Web esta marca nunca existe.
+  if (window.__WAMD_MODO_TESTE__ === true) {
+    window.__WAMD_INTERNO__ = Object.freeze({
+      APP_VERSION,
+      sanitizeFilename, makeFilename, resolveExt, extFromMime,
+      normalizeLinkCandidate, addUrlsFromText, addUrlsFromObject, extractMessageLinks, isLinkMessage,
+      getOwnMediaCaption, attachRecoveredCaptions, isPlainTextMessage, isMediaMessage,
+      compareMessages, messageTimestamp, messageStanzaId, replyTargetsMedia,
+      dayRangeToEpochSeconds, intervaloDatas, withinRange,
+      processarEmOrdem, runPool, makeZip, crc32, formatarTamanho,
+      LIMITE_PONTE_BYTES, LIMITE_PARTE_ZIP_BYTES, LIMITE_ITENS_ZIP, PASTA_DOWNLOADS
+    });
+  }
 })();

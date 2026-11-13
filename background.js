@@ -1,19 +1,26 @@
-// background.js: MV3 service worker.
+// WhatSave — background.js
+// Versão 1.4.0 (2026-11-13): textos e comentários em português do Brasil;
+// validação do nome de arquivo e do conteúdo antes de salvar; registro com o
+// prefixo [WhatSave].
+// Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
+// Histórico completo das versões: CHANGELOG.md no repositório.
 //
-// Service workers have no persistent DOM, so URL.createObjectURL() for a Blob
-// is not reliably available here. Instead we accept a base64 payload from the
-// page and hand Chrome a data: URL, which chrome.downloads.download() can
-// always save regardless of context.
+// Service worker da extensão (Manifest V3).
 //
-// Routing every save through this single API call (instead of clicking an
-// <a download> inside the WhatsApp Web page) is what lets the extension save
-// many files back-to-back without Chrome's "this site is trying to download
-// multiple files" prompt, which only fires for page-initiated downloads.
+// Service workers não têm DOM permanente, então URL.createObjectURL() para um
+// Blob não é confiável aqui. Por isso, a página envia o conteúdo em base64 e
+// este script entrega ao Chrome uma URL data:, que chrome.downloads.download()
+// sempre consegue salvar.
+//
+// Encaminhar todos os salvamentos por esta única API (em vez de clicar em um
+// <a download> dentro do WhatsApp Web) permite salvar muitos arquivos em
+// sequência sem o aviso "este site está tentando baixar vários arquivos", que
+// só se aplica a downloads iniciados pela página.
 
 const downloads = chrome.downloads;
 
-// Fallback: raw ArrayBuffer -> base64 (used only if a caller ever sends a
-// buffer instead of a pre-encoded string).
+// Alternativa: converte um ArrayBuffer em base64 (usada apenas se algum
+// chamador enviar o buffer em vez da string já codificada).
 function arrayBufferToBase64(buffer) {
   const bytes = new Uint8Array(buffer);
   const chunkSize = 0x8000;
@@ -24,19 +31,31 @@ function arrayBufferToBase64(buffer) {
   return btoa(binary);
 }
 
+// Nome relativo seguro: sem barras invertidas, sem "..", sem barra inicial e
+// sem segmentos vazios (o Chrome recusa caminhos absolutos ou com "..").
+function normalizarCaminho(nome) {
+  return String(nome || '')
+    .replace(/\\/g, '/')
+    .split('/')
+    .map(parte => parte.trim())
+    .filter(parte => parte && parte !== '.' && parte !== '..')
+    .join('/');
+}
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   (async () => {
     try {
       if (msg?.type === 'wa:download') {
         const { base64, arrayBuffer, filename, mime } = msg.payload || {};
-        if (!filename) {
-          sendResponse({ ok: false, error: 'missing filename' });
+        const caminho = normalizarCaminho(filename);
+        if (!caminho) {
+          sendResponse({ ok: false, error: 'nome de arquivo ausente' });
           return;
         }
 
         const b64 = base64 || (arrayBuffer ? arrayBufferToBase64(arrayBuffer) : null);
         if (!b64) {
-          sendResponse({ ok: false, error: 'missing file data (base64/arrayBuffer)' });
+          sendResponse({ ok: false, error: 'conteúdo do arquivo ausente (base64/arrayBuffer)' });
           return;
         }
 
@@ -44,7 +63,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
         await downloads.download({
           url: dataUrl,
-          filename,
+          filename: caminho,
           saveAs: false,
           conflictAction: 'uniquify'
         });
@@ -54,16 +73,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       }
 
       if (msg?.type === 'wa:log') {
-        console.log('[WA Media Downloader]', msg.message);
+        console.log('[WhatSave]', msg.message);
         sendResponse({ ok: true });
         return;
       }
 
-      sendResponse({ ok: false, error: 'unknown message type' });
+      sendResponse({ ok: false, error: 'tipo de mensagem desconhecido' });
     } catch (e) {
-      console.error('[WA Media Downloader] background error:', e);
+      console.error('[WhatSave] Erro no service worker:', e);
       sendResponse({ ok: false, error: String(e?.message || e) });
     }
   })();
-  return true; // keep the message channel open for the async response
+  return true; // Mantém o canal aberto para a resposta assíncrona.
 });

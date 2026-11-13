@@ -1,4 +1,14 @@
-// popup.js: wires the popup UI to the in-page script via content.js.
+// WhatSave — popup.js
+// Versão 1.4.0 (2026-11-13): mensagens em português do Brasil; o WhatsApp Web
+// passa a abrir em uma nova aba (a aba atual não é mais substituída); proteção
+// contra resposta vazia de executeScript; validação do intervalo de datas;
+// botão "Carregar mais mensagens" sempre restaurado, mesmo em caso de erro;
+// preferência inválida em listas volta ao valor padrão; ajuste de largura em
+// celulares e tablets (classe "celular").
+// Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
+// Histórico completo das versões: CHANGELOG.md no repositório.
+//
+// Liga a interface do popup ao script da página, por meio do content.js.
 const D = (sel) => document.querySelector(sel);
 const logEl = D('#log');
 const progWrap = D('#progressWrap');
@@ -15,7 +25,19 @@ const statLinks = D('#statLinks');
 const loadMoreBtn = D('#loadMoreBtn');
 const closeStatsBtn = D('#closeStatsBtn');
 
-// --- Persist a handful of UI preferences across popup openings ---
+// Em celulares e tablets o popup abre em tela cheia; a classe ajusta a largura.
+// A tela física de um computador nunca tem o menor lado abaixo de 600 px.
+try {
+  const menorLado = Math.min(window.screen?.width || 0, window.screen?.height || 0);
+  if (menorLado > 0 && menorLado < 600 && (navigator.maxTouchPoints || 0) > 0) {
+    document.documentElement.classList.add('celular');
+  }
+} catch (_) {}
+
+const WHATSAPP_URL = 'https://web.whatsapp.com/';
+const FORMATO_DATA_PADRAO = 'YYYY-MM-DD_HH-mm-ss';
+
+// --- Preferências da interface mantidas entre aberturas do popup ---
 const PREFS_KEY = 'wamd_prefs';
 const prefSelectors = {
   useDate: '#useDate',
@@ -34,18 +56,21 @@ const prefSelectors = {
 function loadPrefs() {
   try {
     const saved = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+    if (!saved || typeof saved !== 'object') return;
     for (const [key, selector] of Object.entries(prefSelectors)) {
       const el = D(selector);
       if (!el || !(key in saved)) continue;
       if (el.type === 'checkbox') el.checked = !!saved[key];
       else {
         const fallback = el.value;
-        el.value = saved[key];
-        // Valor salvo que não existe mais no <select> deixaria o campo vazio.
+        el.value = String(saved[key]);
+        // Um valor salvo que não existe mais na lista deixaria o campo vazio.
         if (el.tagName === 'SELECT' && el.selectedIndex === -1) el.value = fallback;
       }
     }
-  } catch (_) {}
+  } catch (_) {
+    // Preferências corrompidas ou armazenamento indisponível: mantém os padrões.
+  }
 }
 
 function savePrefs() {
@@ -57,7 +82,9 @@ function savePrefs() {
       values[key] = el.type === 'checkbox' ? !!el.checked : el.value;
     }
     localStorage.setItem(PREFS_KEY, JSON.stringify(values));
-  } catch (_) {}
+  } catch (_) {
+    // Armazenamento indisponível (por exemplo, janela anônima restrita).
+  }
 }
 
 function bindPrefPersistence() {
@@ -87,7 +114,7 @@ function formatDateExample(pattern, d = new Date(2026, 8, 23, 15, 30, 45)) {
     'YYYYMMDD': `${YYYY}${MM}${DD}`,
     'YYMMDD_HHmmss': `${YY}${MM}${DD}_${HH}${mm}${ss}`
   };
-  return formats[pattern] || formats['YYYY-MM-DD_HH-mm-ss'];
+  return formats[pattern] || formats[FORMATO_DATA_PADRAO];
 }
 
 function syncDateFormatVisibility() {
@@ -97,7 +124,7 @@ function syncDateFormatVisibility() {
   const preview = D('#dateFormatPreview');
   if (group) group.style.display = enabled ? 'block' : 'none';
   if (select) select.disabled = !enabled;
-  if (preview) preview.textContent = `Example: 0001_Chat_${formatDateExample(select?.value || 'YYYY-MM-DD_HH-mm-ss')}.jpg`;
+  if (preview) preview.textContent = `Exemplo: 0001_Chat_${formatDateExample(select?.value || FORMATO_DATA_PADRAO)}.jpg`;
 }
 
 D('#useDate')?.addEventListener('change', syncDateFormatVisibility);
@@ -105,12 +132,11 @@ D('#dateFormat')?.addEventListener('change', syncDateFormatVisibility);
 syncDateFormatVisibility();
 
 function log(msg) {
-  const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  const line = `[${new Date().toLocaleTimeString('pt-BR')}] ${msg}`;
   logEl.textContent = (logEl.textContent + '\n' + line).trim();
 
-  // Bound the log buffer so a very large batch (hundreds of files) never
-  // turns the <pre> into a multi thousand line DOM node that slows the
-  // popup down.
+  // Limita o registro para que um lote muito grande (centenas de arquivos)
+  // não transforme o <pre> em um nó com milhares de linhas, deixando o popup lento.
   const lines = logEl.textContent.split('\n');
   const MAX_LINES = 500;
   if (lines.length > MAX_LINES) {
@@ -125,34 +151,33 @@ function getSelectedChatIds() {
 }
 
 async function getActiveTab() {
-  const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!activeTab?.id) throw new Error('No active tab');
-
-  // Prefer an already open, fully loaded WhatsApp Web tab over the active one.
+  // Prefere uma aba do WhatsApp Web já aberta e totalmente carregada.
   const waTabs = await chrome.tabs.query({ url: 'https://web.whatsapp.com/*' });
   if (waTabs && waTabs.length > 0) {
     return waTabs.find(t => t.status === 'complete') || waTabs[0];
   }
 
-  // No WhatsApp Web tab open, load it in the current tab.
-  await chrome.tabs.update(activeTab.id, { url: 'https://web.whatsapp.com' });
+  // Nenhuma aba do WhatsApp Web aberta: abre uma nova aba, sem substituir a
+  // página que o usuário estava usando.
+  await chrome.tabs.create({ url: WHATSAPP_URL, active: true });
 
-  // Close the popup while the page loads so the user can reopen it once ready.
+  // Fecha o popup enquanto a página carrega; o usuário o reabre em seguida.
   setTimeout(() => {
     try { window.close(); } catch (_) {}
   }, 50);
 
-  throw new Error('Opening WhatsApp Web in this tab. Reopen the extension once it has loaded.');
+  throw new Error('O WhatsApp Web foi aberto em uma nova aba. Reabra a extensão quando a página terminar de carregar.');
 }
 
 async function runInMain(tabId, func, ...args) {
-  const [{ result }] = await chrome.scripting.executeScript({
+  const results = await chrome.scripting.executeScript({
     target: { tabId },
     func,
     args,
     world: 'MAIN'
   });
-  return result;
+  // executeScript pode devolver lista vazia se a aba fechar ou navegar no meio.
+  return Array.isArray(results) && results.length ? results[0]?.result : undefined;
 }
 
 async function injectFile(tabId, file) {
@@ -163,8 +188,8 @@ async function injectFile(tabId, file) {
   });
 }
 
-// Must match APP_VERSION in inpage/app.js.
-const APP_VERSION = '1.3.9';
+// Precisa ser igual a APP_VERSION em inpage/app.js.
+const APP_VERSION = '1.4.0';
 
 function waitForTabComplete(tabId, timeoutMs = 20000) {
   const deadline = Date.now() + timeoutMs;
@@ -184,36 +209,36 @@ function waitForTabComplete(tabId, timeoutMs = 20000) {
 }
 
 async function ensureInjected(tabId) {
-  // A tab open since before an extension update still has the previous
-  // app.js in it, and app.js's own load guard means injecting again is a
-  // no-op. The popup would then be sending the current command format to
-  // code that predates it, which fails in confusing ways rather than
-  // loudly. Reload the tab so the current build gets a clean injection.
+  // Uma aba aberta antes de uma atualização da extensão ainda contém o app.js
+  // anterior, e a proteção de carregamento do app.js torna uma nova injeção
+  // inócua. O popup enviaria então o formato atual de comandos a um código
+  // antigo, com falhas difíceis de entender. Por isso, a aba é recarregada para
+  // receber a versão atual de forma limpa.
   const injected = await runInMain(tabId, () => ({
     loaded: !!window.__WAMD_APP_LOADED__,
     version: window.__WAMD_APP_VERSION__ || null
   }));
 
   if (injected?.loaded && injected.version !== APP_VERSION) {
-    log('Tab is running an older version of the extension. Reloading WhatsApp Web...');
+    log('A aba está com uma versão anterior da extensão. Recarregando o WhatsApp Web…');
     await chrome.tabs.reload(tabId);
     await waitForTabComplete(tabId);
   }
 
   const hasWpp = await runInMain(tabId, () => !!window.WPP);
   if (!hasWpp) {
-    await injectFile(tabId, 'inpage/vendor/wppconnect-wa-wrapped.js').catch(e => log('Vendor injection error: ' + e.message));
+    await injectFile(tabId, 'inpage/vendor/wppconnect-wa-wrapped.js').catch(e => log('Erro ao injetar a biblioteca wa-js: ' + e.message));
   }
 
   const appLoaded = await runInMain(tabId, () => !!window.__WAMD_APP_LOADED__);
   if (!appLoaded) {
-    log('Loading app...');
-    await injectFile(tabId, 'inpage/app.js').catch(e => log('App injection error: ' + e.message));
+    log('Carregando o módulo da página…');
+    await injectFile(tabId, 'inpage/app.js').catch(e => log('Erro ao injetar o app.js: ' + e.message));
   }
 }
 
-// Ensure content.js is present before tabs.sendMessage, to avoid:
-// "Could not establish connection. Receiving end does not exist."
+// Garante que o content.js está presente antes de tabs.sendMessage, evitando o
+// erro "Could not establish connection. Receiving end does not exist.".
 async function ensureContentScript(tabId) {
   const ping = async () => chrome.tabs.sendMessage(tabId, { __to: 'wamd:content', payload: { type: 'ping' } });
 
@@ -242,25 +267,27 @@ async function sendToPage(message) {
 
   const ok = await ensureContentScript(tab.id);
   if (!ok) {
-    log('Could not reach the content script. Reload WhatsApp Web and try again.');
-    return;
+    log('Não foi possível comunicar com a página. Recarregue o WhatsApp Web e tente novamente.');
+    return false;
   }
 
   try {
     await chrome.tabs.sendMessage(tab.id, { __to: 'wamd:content', payload: message });
+    return true;
   } catch (err) {
     const ok2 = await ensureContentScript(tab.id);
     if (ok2) {
       await chrome.tabs.sendMessage(tab.id, { __to: 'wamd:content', payload: message });
-    } else {
-      log('tabs.sendMessage error: ' + (err?.message || String(err)));
+      return true;
     }
+    log('Erro ao enviar o comando para a página: ' + (err?.message || String(err)));
+    return false;
   }
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!msg || msg.__from !== 'wamd:content') return;
-  const data = msg.payload;
+  const data = msg.payload || {};
 
   if (data.type === 'wa:log') {
     log(data.message);
@@ -271,24 +298,24 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       bar.style.width = pct + '%';
     }
   } else if (data.type === 'inpage:resp' && data.cmd === 'listChats') {
-    const chats = data.payload || [];
+    const chats = Array.isArray(data.payload) ? data.payload : [];
     chatSel.innerHTML = '';
 
     for (const c of chats) {
       const opt = document.createElement('option');
       opt.value = c.id;
-      opt.textContent = c.name + ' (' + c.id + ')';
+      opt.textContent = `${c.name} (${c.id})`;
       chatSel.appendChild(opt);
     }
     chatSel.disabled = false;
-    log(`Found ${chats.length} chats. Select one or more, then click Download all.`);
+    log(`${chats.length} conversa(s) encontrada(s). Selecione uma ou mais e clique em "Exportar itens selecionados".`);
   } else if (data.type === 'inpage:resp' && data.cmd === 'getStats') {
     displayStats(data.payload || {});
   } else if (data.type === 'inpage:error') {
-    log('Error: ' + data.error);
+    log('Erro: ' + data.error);
   } else if (data.type === 'inpage:resp' && data.cmd === 'download') {
     const { count, chats } = data.payload || { count: 0, chats: 0 };
-    log(`Done. Exported ${count} item(s) across ${chats || 1} chat(s).`);
+    log(`Concluído: ${count} item(ns) exportado(s) de ${chats || 1} conversa(s).`);
     bar.style.width = '100%';
     setTimeout(() => { progWrap.style.display = 'none'; bar.style.width = '0%'; }, 700);
   }
@@ -322,18 +349,18 @@ function displayStats(stats) {
   statDocuments.textContent = stats.documents || 0;
   if (statLinks) statLinks.textContent = stats.links || 0;
 
-  log(`Statistics loaded: ${stats.totalMedia || 0} media + ${stats.links || 0} link item(s) found`);
+  log(`Estatísticas carregadas: ${stats.totalMedia || 0} mídia(s) e ${stats.links || 0} link(s).`);
 }
 
 async function loadChatStats() {
   const ids = getSelectedChatIds();
   if (ids.length !== 1) {
-    // Detailed stats only make sense for a single chat at a time.
+    // As estatísticas detalhadas só fazem sentido para uma conversa por vez.
     statsSection.style.display = 'none';
     return;
   }
 
-  log('Loading chat statistics...');
+  log('Carregando as estatísticas da conversa…');
   await sendToPage({
     __from: 'wamd:inpage',
     type: 'popup:cmd',
@@ -342,60 +369,66 @@ async function loadChatStats() {
   });
 }
 
-chatSel.addEventListener('change', loadChatStats);
+chatSel.addEventListener('change', () => { loadChatStats().catch(e => log('Erro: ' + e.message)); });
 
 closeStatsBtn?.addEventListener('click', () => {
   statsSection.style.display = 'none';
-  log('Statistics hidden');
+  log('Estatísticas ocultadas.');
 });
 
-// "Load More": asks WhatsApp Web to fetch older history, 5 rounds back to back.
-// Only works against a single chat at a time.
+// "Carregar mais mensagens": pede ao WhatsApp Web que busque o histórico mais
+// antigo, em 5 rodadas seguidas. Funciona com uma conversa por vez.
 loadMoreBtn?.addEventListener('click', async () => {
   const ids = getSelectedChatIds();
   if (ids.length !== 1) {
-    log('Select exactly one chat to load more history for it.');
+    log('Selecione exatamente uma conversa para carregar o histórico dela.');
     return;
   }
   const selectedChatId = ids[0];
 
   const totalLoads = 5;
-  log(`Loading older history (${totalLoads} rounds)...`);
+  log(`Carregando o histórico mais antigo (${totalLoads} rodadas)…`);
   loadMoreBtn.disabled = true;
 
-  for (let i = 1; i <= totalLoads; i++) {
-    loadMoreBtn.textContent = `Loading ${i}/${totalLoads}...`;
+  try {
+    for (let i = 1; i <= totalLoads; i++) {
+      loadMoreBtn.textContent = `Carregando ${i}/${totalLoads}…`;
 
-    await sendToPage({
-      __from: 'wamd:inpage',
-      type: 'popup:cmd',
-      cmd: 'loadMore',
-      payload: { selectedChatId }
-    });
+      const enviado = await sendToPage({
+        __from: 'wamd:inpage',
+        type: 'popup:cmd',
+        cmd: 'loadMore',
+        payload: { selectedChatId }
+      });
+      if (!enviado) break;
 
-    await new Promise(r => setTimeout(r, 6000));
-    await loadChatStats();
+      await new Promise(r => setTimeout(r, 6000));
+      await loadChatStats();
+    }
+    log('Carregamento do histórico concluído. Confira as estatísticas atualizadas.');
+  } catch (e) {
+    log('Erro ao carregar mais mensagens: ' + (e?.message || e));
+  } finally {
+    // O botão sempre volta ao estado normal, mesmo se algo falhar.
+    loadMoreBtn.disabled = false;
+    loadMoreBtn.textContent = 'Carregar mais mensagens';
   }
-
-  loadMoreBtn.disabled = false;
-  loadMoreBtn.textContent = 'Load more messages';
-  log('Finished loading older history. Check the updated statistics.');
 });
 
 async function refreshChats() {
   chatSel.disabled = true;
-  chatSel.innerHTML = `<option value="">Loading chats...</option>`;
+  chatSel.innerHTML = '<option value="">Carregando conversas…</option>';
   await sendToPage({ __from: 'wamd:inpage', type: 'popup:ready?' });
   await sendToPage({ __from: 'wamd:inpage', type: 'popup:cmd', cmd: 'listChats', payload: {} });
 }
 
-D('#refresh').addEventListener('click', refreshChats);
+D('#refresh').addEventListener('click', () => { refreshChats().catch(e => log('Erro: ' + e.message)); });
 
 D('#start').addEventListener('click', async () => {
   const chatIds = getSelectedChatIds();
 
   if (!chatIds.length) {
-    log('Select at least one chat from the list first.');
+    log('Selecione pelo menos uma conversa na lista.');
     chatSel.scrollIntoView({ block: 'center', behavior: 'smooth' });
     chatSel.focus({ preventScroll: true });
     chatSel.classList.add('attn');
@@ -405,13 +438,22 @@ D('#start').addEventListener('click', async () => {
 
   const types = getTypes();
   if (!types.length) {
-    log('Select at least one media type or Links.');
+    log('Selecione pelo menos um tipo de item.');
+    return;
+  }
+
+  const dateFrom = D('#dateFrom').value || '';
+  const dateTo = D('#dateTo').value || '';
+  // Datas no formato AAAA-MM-DD podem ser comparadas como texto.
+  if (dateFrom && dateTo && dateFrom > dateTo) {
+    log('A data "De" é posterior à data "Até". Corrija o período e tente novamente.');
+    D('#dateFrom').focus();
     return;
   }
 
   const naming = {
     useDate: D('#useDate').checked,
-    dateFormat: D('#dateFormat')?.value || 'YYYY-MM-DD_HH-mm-ss',
+    dateFormat: D('#dateFormat')?.value || FORMATO_DATA_PADRAO,
     includeSenderName: D('#includeSenderName')?.checked ?? false,
     captionSuffix: D('#useCaptionSuffix').checked,
     appendOrigNameAll: D('#appendOrigNameAll')?.checked ?? true
@@ -426,19 +468,21 @@ D('#start').addEventListener('click', async () => {
     captureReplyCaption: D('#captureReplyCaption')?.checked !== false
   };
 
-  const dateFrom = D('#dateFrom').value || '';
-  const dateTo = D('#dateTo').value || '';
-
-  log(`Starting export. chats=${chatIds.length}, zip=${pack.saveAsZip}, parallel=${pack.concurrency}, nextCaption=${pack.captureNextMessageCaption}, replyCaption=${pack.captureReplyCaption}, dateFormat=${naming.dateFormat}, types=[${types.join(',')}]`);
+  log(`Iniciando a exportação: ${chatIds.length} conversa(s), ZIP: ${pack.saveAsZip ? 'sim' : 'não'}, ${pack.concurrency} por vez, tipos: ${types.join(', ')}.`);
   progWrap.style.display = 'block';
   bar.style.width = '4%';
 
-  await sendToPage({
-    __from: 'wamd:inpage',
-    type: 'popup:cmd',
-    cmd: 'download',
-    payload: { chatIds, types, dateFrom, dateTo, naming, pack }
-  });
+  try {
+    await sendToPage({
+      __from: 'wamd:inpage',
+      type: 'popup:cmd',
+      cmd: 'download',
+      payload: { chatIds, types, dateFrom, dateTo, naming, pack }
+    });
+  } catch (e) {
+    log('Erro ao iniciar a exportação: ' + (e?.message || e));
+    progWrap.style.display = 'none';
+  }
 });
 
 (async () => {
@@ -447,6 +491,6 @@ D('#start').addEventListener('click', async () => {
     await ensureInjected(tab.id);
     await refreshChats();
   } catch (e) {
-    log('Init: ' + e.message);
+    log(e?.message || String(e));
   }
 })();

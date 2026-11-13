@@ -1,5 +1,13 @@
 <!doctype html>
-<html lang="en">
+<!--
+  WhatSave — popup.html
+  Versão 1.4.0 (2026-11-13): interface em português do Brasil; textos de ajuda
+  revisados e alinhados ao funcionamento atual; validação do intervalo de datas;
+  créditos do autor original e da manutenção no rodapé.
+  Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
+  Histórico completo das versões: CHANGELOG.md no repositório.
+-->
+<html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
   <title>WhatSave</title>
@@ -11,131 +19,129 @@
     <img src="assets/logo.svg" width="28" height="28" alt="" />
     <div>
       <h1>WhatSave</h1>
-      <p>Bulk WhatsApp exporter with chat-order media, captions, replies, and viewing links</p>
+      <p>Exportação em massa de mídias, legendas e links do WhatsApp Web, na ordem do chat</p>
     </div>
   </header>
 
   <main>
     <section class="section">
       <div class="section-head">
-        <h2><label for="chatSelect">Chats</label></h2>
-        <button type="button" id="refresh" class="btn-quiet">Update list</button>
+        <h2><label for="chatSelect">Conversas</label></h2>
+        <button type="button" id="refresh" class="btn-quiet">Atualizar lista</button>
       </div>
       <select id="chatSelect" class="select" multiple size="6" disabled>
-        <option value="">Loading chats...</option>
+        <option value="">Carregando conversas…</option>
       </select>
-      <p class="hint">Select one or more chats. Export numbers start at 0001 and follow the chat from oldest to newest across the selected media and links. Caption matching never searches distant messages.</p>
+      <p class="hint">Selecione uma ou mais conversas (Ctrl ou Shift para várias). A numeração começa em 0001 e segue a conversa da mensagem mais antiga para a mais recente.</p>
     </section>
 
     <section class="section" id="statsSection" style="display:none;">
       <div class="stats">
         <div class="stats-head">
-          <h2>Chat statistics</h2>
-          <button type="button" id="closeStatsBtn" class="btn-icon" aria-label="Hide statistics">&times;</button>
+          <h2>Estatísticas da conversa</h2>
+          <button type="button" id="closeStatsBtn" class="btn-icon" aria-label="Ocultar estatísticas">&times;</button>
         </div>
         <dl>
-          <dt>Date range</dt>          <dd id="statDateRange">-</dd>
-          <dt>Total media (loaded)</dt><dd id="statMediaCount">-</dd>
-          <dt>Images</dt>              <dd id="statImages">-</dd>
-          <dt>Videos</dt>              <dd id="statVideos">-</dd>
-          <dt>Audio</dt>               <dd id="statAudio">-</dd>
-          <dt>Documents</dt>           <dd id="statDocuments">-</dd>
-          <dt>Links</dt>               <dd id="statLinks">-</dd>
+          <dt>Período</dt>               <dd id="statDateRange">-</dd>
+          <dt>Mídias carregadas</dt>     <dd id="statMediaCount">-</dd>
+          <dt>Imagens</dt>               <dd id="statImages">-</dd>
+          <dt>Vídeos</dt>                <dd id="statVideos">-</dd>
+          <dt>Áudios</dt>                <dd id="statAudio">-</dd>
+          <dt>Documentos</dt>            <dd id="statDocuments">-</dd>
+          <dt>Links</dt>                 <dd id="statLinks">-</dd>
         </dl>
-        <p class="hint">Statistics reflect messages currently loaded in WhatsApp Web. Links are text messages containing a web address or WhatsApp link-preview URL. Load more messages before exporting older items.</p>
-        <button type="button" id="loadMoreBtn" class="btn" style="margin-top:8px;">Load more messages</button>
+        <p class="hint">Os números consideram apenas as mensagens já carregadas no WhatsApp Web. Para exportar itens mais antigos, carregue mais mensagens antes.</p>
+        <button type="button" id="loadMoreBtn" class="btn" style="margin-top:8px;">Carregar mais mensagens</button>
       </div>
     </section>
 
     <section class="section">
       <div class="section-head">
-        <h2>Media type</h2>
+        <h2>Tipos de item</h2>
         <div class="row">
-          <button type="button" id="filterAll" class="btn-quiet">All</button>
-          <button type="button" id="filterVideosOnly" class="btn-quiet">Videos only</button>
+          <button type="button" id="filterAll" class="btn-quiet">Todos</button>
+          <button type="button" id="filterVideosOnly" class="btn-quiet">Somente vídeos</button>
         </div>
       </div>
       <div class="types">
-        <label class="check"><input type="checkbox" class="t" value="image" checked> Images</label>
-        <label class="check"><input type="checkbox" class="t" value="video" checked> Video</label>
-        <label class="check"><input type="checkbox" class="t" value="audio" checked> Audio</label>
-        <label class="check"><input type="checkbox" class="t" value="document" checked> Documents</label>
+        <label class="check"><input type="checkbox" class="t" value="image" checked> Imagens</label>
+        <label class="check"><input type="checkbox" class="t" value="video" checked> Vídeos</label>
+        <label class="check"><input type="checkbox" class="t" value="audio" checked> Áudios</label>
+        <label class="check"><input type="checkbox" class="t" value="document" checked> Documentos</label>
         <label class="check"><input type="checkbox" class="t" value="link" checked> Links</label>
       </div>
-      <p class="hint">Links are taken from the same messages loaded for the selected chat, then filtered by the selected date range. This keeps link exports scoped to the chosen chat/group. A link is exported only when a real URL is found in the selected chat. WhatSave checks message/link-preview fields first and the visible message HTML as a fallback, so clickable viewing links that WhatsApp does not expose in the message object can still be captured.</p>
+      <p class="hint">Cada mensagem com link vira um arquivo .txt (UTF-8) com todos os endereços encontrados. Somente links da conversa selecionada e do período escolhido são exportados.</p>
     </section>
 
     <section class="section">
-      <h2>Date range</h2>
+      <h2>Período</h2>
       <div class="grid-2" style="margin-top:12px;">
         <div class="field">
-          <label for="dateFrom">From</label>
-          <input id="dateFrom" type="date" class="input" max="2100-12-31" />
+          <label for="dateFrom">De</label>
+          <input id="dateFrom" type="date" class="input" min="2009-01-01" max="2100-12-31" />
         </div>
         <div class="field">
-          <label for="dateTo">To</label>
-          <input id="dateTo" type="date" class="input" max="2100-12-31" />
+          <label for="dateTo">Até</label>
+          <input id="dateTo" type="date" class="input" min="2009-01-01" max="2100-12-31" />
         </div>
       </div>
-      <p class="hint">Leave both fields empty to include all dates. The filter applies to each item’s message timestamp, including links.</p>
+      <p class="hint">Deixe os dois campos vazios para incluir todas as datas. O filtro usa a data de cada mensagem, inclusive a dos links.</p>
     </section>
 
     <section class="section">
-      <h2>Options</h2>
+      <h2>Opções</h2>
       <div class="options" style="margin-top:8px;">
-        <label class="check"><input type="checkbox" id="saveAsZip" checked> Save as a single ZIP</label>
-        <label class="check"><input type="checkbox" id="preserveChatOrder" checked> Preserve chat order</label>
-        <p class="option-help">Sorts the complete scanned chat timeline before captions, links, numbering, and saving. Item numbers are assigned in chat order, and individual downloads are saved in that same order.</p>
-        <label class="check"><input type="checkbox" id="appendOrigNameAll" checked> Keep original filename</label>
-        <label class="check"><input type="checkbox" id="useDate"> Add date/time to filename</label>
+        <label class="check"><input type="checkbox" id="saveAsZip" checked> Salvar em um único ZIP por conversa</label>
+        <p class="option-help">Conversas muito grandes são divididas automaticamente em partes (_parte01, _parte02…), para não esgotar a memória do navegador.</p>
+        <label class="check"><input type="checkbox" id="preserveChatOrder" checked> Preservar a ordem do chat</label>
+        <p class="option-help">Os arquivos são buscados em paralelo, mas salvos um a um, do mais antigo para o mais recente.</p>
+        <label class="check"><input type="checkbox" id="appendOrigNameAll" checked> Manter o nome original do arquivo</label>
+        <label class="check"><input type="checkbox" id="useDate"> Incluir data e hora no nome</label>
 
         <div id="dateFormatGroup" class="sub-option">
           <div class="field">
-            <label for="dateFormat">Date format</label>
+            <label for="dateFormat">Formato da data</label>
             <select id="dateFormat" class="select" aria-describedby="dateFormatHelp dateFormatPreview">
-              <option value="YYYY-MM-DD_HH-mm-ss" selected>2026-09-23_15-30-45  —  YYYY-MM-DD_HH-mm-ss</option>
-              <option value="YYYY-MM-DD">2026-09-23  —  YYYY-MM-DD</option>
-              <option value="DD-MM-YYYY_HH-mm-ss">23-09-2026_15-30-45  —  DD-MM-YYYY_HH-mm-ss</option>
-              <option value="DD-MM-YYYY">23-09-2026  —  DD-MM-YYYY</option>
-              <option value="YYYYMMDD_HHmmss">20260923_153045  —  YYYYMMDD_HHmmss</option>
-              <option value="YYYYMMDD">20260923  —  YYYYMMDD</option>
-              <option value="YYMMDD_HHmmss">260923_153045  —  YYMMDD_HHmmss</option>
+              <option value="YYYY-MM-DD_HH-mm-ss" selected>2026-09-23_15-30-45  —  AAAA-MM-DD_HH-mm-ss</option>
+              <option value="YYYY-MM-DD">2026-09-23  —  AAAA-MM-DD</option>
+              <option value="DD-MM-YYYY_HH-mm-ss">23-09-2026_15-30-45  —  DD-MM-AAAA_HH-mm-ss</option>
+              <option value="DD-MM-YYYY">23-09-2026  —  DD-MM-AAAA</option>
+              <option value="YYYYMMDD_HHmmss">20260923_153045  —  AAAAMMDD_HHmmss</option>
+              <option value="YYYYMMDD">20260923  —  AAAAMMDD</option>
+              <option value="YYMMDD_HHmmss">260923_153045  —  AAMMDD_HHmmss</option>
             </select>
-            <p class="hint" id="dateFormatHelp">The selected pattern uses each message timestamp. Date format changes only the filename; it never changes chat order. The sequence number stays first (0001_, 0002_, …) so Windows Explorer sorts the exported files naturally.</p>
-            <p class="filename-preview" id="dateFormatPreview">Example: 0001_Chat_2026-09-23_15-30-45.jpg</p>
+            <p class="hint" id="dateFormatHelp">O formato altera apenas o nome do arquivo, nunca a ordem. O número sequencial continua no início (0001_, 0002_…), para que o Windows ordene os arquivos corretamente.</p>
+            <p class="filename-preview" id="dateFormatPreview">Exemplo: 0001_Chat_2026-09-23_15-30-45.jpg</p>
           </div>
         </div>
 
-        <label class="check"><input type="checkbox" id="includeSenderName"> Add sender to filename</label>
-        <label class="check"><input type="checkbox" id="useCaptionSuffix"> Add caption to media filename</label>
-        <label class="check"><input type="checkbox" id="captureNextMessageCaption" checked> Capture caption from the immediate next message</label>
-        <p class="option-help">Only the single message immediately after the media in the verified chronological chat sequence is considered. It must be plain text, from the same chat and sender, and within 15 seconds. No later message is searched. If adjacency cannot be proven, the media stays without a recovered caption.</p>
-        <label class="check"><input type="checkbox" id="captureReplyCaption" checked> Capture caption from a direct reply</label>
-        <p class="option-help">Only a plain-text reply with an exact WhatsApp reference to this specific media is accepted. Approximate or partial IDs are rejected. A reply that points somewhere else is never used as the caption.</p>
-        <label class="check"><input type="checkbox" id="deepScan"> Deep scan (slower, reaches further back)</label>
-        <p class="option-help">Links are detected from the selected chat’s normal message history and exported as one UTF-8 .txt per link message. The first real URL is included in the filename, and every URL found in that message is written inside the .txt. Messages outside the selected chat or date range are ignored.</p>
+        <label class="check"><input type="checkbox" id="includeSenderName"> Incluir o remetente no nome</label>
+        <label class="check"><input type="checkbox" id="useCaptionSuffix"> Incluir a legenda no nome da mídia</label>
+        <label class="check"><input type="checkbox" id="captureReplyCaption" checked> Usar resposta direta como legenda</label>
+        <p class="option-help">Aceita apenas uma resposta de texto que cite exatamente esta mídia. Respostas a outras mensagens nunca são usadas.</p>
+        <label class="check"><input type="checkbox" id="captureNextMessageCaption" checked> Usar a mensagem seguinte como legenda</label>
+        <p class="option-help">Considera somente a mensagem imediatamente posterior à mídia: texto simples, mesma conversa, mesmo remetente e até 15 segundos depois. Se a sequência não puder ser comprovada, a mídia fica sem legenda.</p>
+        <label class="check"><input type="checkbox" id="deepScan"> Análise profunda (mais lenta, alcança mensagens mais antigas)</label>
       </div>
 
       <div class="field" style="margin-top:12px;">
-        <label for="concurrency">Parallel downloads</label>
+        <label for="concurrency">Downloads simultâneos</label>
         <select id="concurrency" class="select">
-          <option value="2">2 files at a time</option>
-          <option value="4" selected>4 files at a time</option>
-          <option value="6">6 files at a time</option>
-          <option value="8">8 files at a time</option>
+          <option value="2">2 arquivos por vez</option>
+          <option value="4" selected>4 arquivos por vez</option>
+          <option value="6">6 arquivos por vez</option>
+          <option value="8">8 arquivos por vez</option>
         </select>
-        <p class="hint">Higher values speed up fetching. With Preserve chat order enabled, media can be fetched in parallel, but the final files are saved oldest → newest. Links are exported as UTF-8 .txt files in the same sequence.</p>
+        <p class="hint">Valores maiores aceleram a busca, mas exigem mais da conexão. Arquivos acima de 40 MB são salvos diretamente na pasta Downloads.</p>
       </div>
-
-      <p class="hint caption-summary"><strong>Captions and links:</strong> the media’s own caption has priority. A direct reply is used only when WhatsApp explicitly points to that exact media. A next-message caption is used only for the literal immediately following text message in verified chat order. Unrelated or uncertain text is never attached. Items selected as <strong>Links</strong> are exported as UTF-8 <strong>.txt</strong> files. WhatSave scans the selected chat’s dedicated URL-message results and also reads link-preview URL fields. The full URL is written inside the file and a safe version of the first URL appears in the filename.</p>
     </section>
 
     <section class="section">
-      <button id="start" class="btn-primary">Export selected items</button>
+      <button id="start" class="btn-primary">Exportar itens selecionados</button>
     </section>
 
     <section class="section">
-      <h2><label for="log">Activity</label></h2>
+      <h2><label for="log">Atividade</label></h2>
       <div class="progress" id="progressWrap" style="display:none;">
         <div class="bar" id="bar"></div>
       </div>
@@ -144,8 +150,9 @@
   </main>
 
   <footer class="footer">
-    <span>Open source · Captions stay in media filenames · Viewing links are saved as UTF-8 .txt · Chat order is applied before numbering and saving</span>
-    <a href="https://github.com/Jstarzz/WhatSave" target="_blank" rel="noopener">github.com/Jstarzz/WhatSave</a>
+    <span>Código aberto · Nada sai do seu computador</span>
+    <span>Autor original: Jstarzz · Edição e manutenção: Ruda Gabriel</span>
+    <a href="https://github.com/RudaGabriel/WhatSave" target="_blank" rel="noopener noreferrer">github.com/RudaGabriel/WhatSave</a>
   </footer>
 
   <script src="popup.js"></script>
