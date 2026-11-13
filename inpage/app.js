@@ -1,9 +1,5 @@
 // WhatSave — inpage/app.js
-// Versão 1.4.0 (2026-11-13): textos e comentários em português do Brasil;
-// salvamento em ordem com janela limitada de memória; ZIP dividido em partes
-// automáticas; arquivos acima de 40 MB salvos diretamente pela página; índice
-// único de respostas; varreduras do DOM limitadas; datas inválidas ou
-// invertidas tratadas; pasta de destino "WhatSave".
+// Versão 1.4.1 (2026-11-13): APP_VERSION atualizada para 1.4.1.
 // Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
 // Histórico completo das versões: CHANGELOG.md no repositório.
 //
@@ -15,7 +11,7 @@
   // Atualizada sempre que o formato das mensagens popup <-> página muda. O popup
   // compara este valor com o seu; assim, uma aba aberta antes de uma atualização
   // da extensão não continua usando um app.js antigo com um popup novo.
-  const APP_VERSION = '1.4.0';
+  const APP_VERSION = '1.4.1';
 
   // Evita a injeção dupla do script.
   if (window.__WAMD_APP_LOADED__) {

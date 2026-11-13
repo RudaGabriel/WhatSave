@@ -1,6 +1,6 @@
 {
   "name": "whatsave",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Extensão de navegador para exportar em massa mídias, legendas e links do WhatsApp Web, na ordem cronológica da conversa.",
   "private": true,
   "license": "MIT",

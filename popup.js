@@ -1,10 +1,5 @@
 // WhatSave — popup.js
-// Versão 1.4.0 (2026-11-13): mensagens em português do Brasil; o WhatsApp Web
-// passa a abrir em uma nova aba (a aba atual não é mais substituída); proteção
-// contra resposta vazia de executeScript; validação do intervalo de datas;
-// botão "Carregar mais mensagens" sempre restaurado, mesmo em caso de erro;
-// preferência inválida em listas volta ao valor padrão; ajuste de largura em
-// celulares e tablets (classe "celular").
+// Versão 1.4.1 (2026-11-13): APP_VERSION atualizada para 1.4.1.
 // Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
 // Histórico completo das versões: CHANGELOG.md no repositório.
 //
@@ -189,7 +184,7 @@ async function injectFile(tabId, file) {
 }
 
 // Precisa ser igual a APP_VERSION em inpage/app.js.
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 
 function waitForTabComplete(tabId, timeoutMs = 20000) {
   const deadline = Date.now() + timeoutMs;

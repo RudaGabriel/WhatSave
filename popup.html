@@ -1,9 +1,7 @@
 <!doctype html>
 <!--
   WhatSave — popup.html
-  Versão 1.4.0 (2026-11-13): interface em português do Brasil; textos de ajuda
-  revisados e alinhados ao funcionamento atual; validação do intervalo de datas;
-  créditos do autor original e da manutenção no rodapé.
+  Versão 1.4.1 (2026-11-13): textos de ajuda resumidos, mais claros e diretos.
   Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
   Histórico completo das versões: CHANGELOG.md no repositório.
 -->
@@ -32,7 +30,7 @@
       <select id="chatSelect" class="select" multiple size="6" disabled>
         <option value="">Carregando conversas…</option>
       </select>
-      <p class="hint">Selecione uma ou mais conversas (Ctrl ou Shift para várias). A numeração começa em 0001 e segue a conversa da mensagem mais antiga para a mais recente.</p>
+      <p class="hint">Ctrl ou Shift seleciona várias. Numeração da mais antiga para a mais recente.</p>
     </section>
 
     <section class="section" id="statsSection" style="display:none;">
@@ -50,7 +48,7 @@
           <dt>Documentos</dt>            <dd id="statDocuments">-</dd>
           <dt>Links</dt>                 <dd id="statLinks">-</dd>
         </dl>
-        <p class="hint">Os números consideram apenas as mensagens já carregadas no WhatsApp Web. Para exportar itens mais antigos, carregue mais mensagens antes.</p>
+        <p class="hint">Considera só as mensagens já carregadas. Para itens antigos, carregue mais.</p>
         <button type="button" id="loadMoreBtn" class="btn" style="margin-top:8px;">Carregar mais mensagens</button>
       </div>
     </section>
@@ -70,7 +68,7 @@
         <label class="check"><input type="checkbox" class="t" value="document" checked> Documentos</label>
         <label class="check"><input type="checkbox" class="t" value="link" checked> Links</label>
       </div>
-      <p class="hint">Cada mensagem com link vira um arquivo .txt (UTF-8) com todos os endereços encontrados. Somente links da conversa selecionada e do período escolhido são exportados.</p>
+      <p class="hint">Cada mensagem com link vira um arquivo .txt.</p>
     </section>
 
     <section class="section">
@@ -85,16 +83,16 @@
           <input id="dateTo" type="date" class="input" min="2009-01-01" max="2100-12-31" />
         </div>
       </div>
-      <p class="hint">Deixe os dois campos vazios para incluir todas as datas. O filtro usa a data de cada mensagem, inclusive a dos links.</p>
+      <p class="hint">Vazio inclui todas as datas.</p>
     </section>
 
     <section class="section">
       <h2>Opções</h2>
       <div class="options" style="margin-top:8px;">
         <label class="check"><input type="checkbox" id="saveAsZip" checked> Salvar em um único ZIP por conversa</label>
-        <p class="option-help">Conversas muito grandes são divididas automaticamente em partes (_parte01, _parte02…), para não esgotar a memória do navegador.</p>
+        <p class="option-help">Conversas grandes são divididas em partes.</p>
         <label class="check"><input type="checkbox" id="preserveChatOrder" checked> Preservar a ordem do chat</label>
-        <p class="option-help">Os arquivos são buscados em paralelo, mas salvos um a um, do mais antigo para o mais recente.</p>
+        <p class="option-help">Salva um a um, do mais antigo para o mais recente.</p>
         <label class="check"><input type="checkbox" id="appendOrigNameAll" checked> Manter o nome original do arquivo</label>
         <label class="check"><input type="checkbox" id="useDate"> Incluir data e hora no nome</label>
 
@@ -110,7 +108,7 @@
               <option value="YYYYMMDD">20260923  —  AAAAMMDD</option>
               <option value="YYMMDD_HHmmss">260923_153045  —  AAMMDD_HHmmss</option>
             </select>
-            <p class="hint" id="dateFormatHelp">O formato altera apenas o nome do arquivo, nunca a ordem. O número sequencial continua no início (0001_, 0002_…), para que o Windows ordene os arquivos corretamente.</p>
+            <p class="hint" id="dateFormatHelp">Altera só o nome, não a ordem.</p>
             <p class="filename-preview" id="dateFormatPreview">Exemplo: 0001_Chat_2026-09-23_15-30-45.jpg</p>
           </div>
         </div>
@@ -118,9 +116,9 @@
         <label class="check"><input type="checkbox" id="includeSenderName"> Incluir o remetente no nome</label>
         <label class="check"><input type="checkbox" id="useCaptionSuffix"> Incluir a legenda no nome da mídia</label>
         <label class="check"><input type="checkbox" id="captureReplyCaption" checked> Usar resposta direta como legenda</label>
-        <p class="option-help">Aceita apenas uma resposta de texto que cite exatamente esta mídia. Respostas a outras mensagens nunca são usadas.</p>
+        <p class="option-help">Só respostas que citam esta mídia.</p>
         <label class="check"><input type="checkbox" id="captureNextMessageCaption" checked> Usar a mensagem seguinte como legenda</label>
-        <p class="option-help">Considera somente a mensagem imediatamente posterior à mídia: texto simples, mesma conversa, mesmo remetente e até 15 segundos depois. Se a sequência não puder ser comprovada, a mídia fica sem legenda.</p>
+        <p class="option-help">Só o texto logo após a mídia, do mesmo remetente, em até 15 segundos.</p>
         <label class="check"><input type="checkbox" id="deepScan"> Análise profunda (mais lenta, alcança mensagens mais antigas)</label>
       </div>
 
@@ -132,7 +130,7 @@
           <option value="6">6 arquivos por vez</option>
           <option value="8">8 arquivos por vez</option>
         </select>
-        <p class="hint">Valores maiores aceleram a busca, mas exigem mais da conexão. Arquivos acima de 40 MB são salvos diretamente na pasta Downloads.</p>
+        <p class="hint">Mais rápido, porém exige mais da conexão. Arquivos acima de 40 MB vão para a pasta Downloads.</p>
       </div>
     </section>
 
