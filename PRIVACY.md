@@ -32,3 +32,8 @@ Questions can be raised as an issue on the GitHub repository:
 https://github.com/Jstarzz/whatsave
 
 Last updated: August 2026.
+
+
+## Caption handling
+
+Caption text is read only from the selected WhatsApp Web chat to construct the downloaded media filename. It is not transmitted to any external service or saved as a separate caption file.

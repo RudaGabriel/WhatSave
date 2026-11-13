@@ -11,7 +11,7 @@
     <img src="assets/logo.svg" width="28" height="28" alt="" />
     <div>
       <h1>WhatSave</h1>
-      <p>Bulk media downloader for WhatsApp Web</p>
+      <p>Bulk WhatsApp exporter with chat-order media, captions, replies, and viewing links</p>
     </div>
   </header>
 
@@ -24,7 +24,7 @@
       <select id="chatSelect" class="select" multiple size="6" disabled>
         <option value="">Loading chats...</option>
       </select>
-      <p class="hint">Select one or more.</p>
+      <p class="hint">Select one or more chats. Export numbers start at 0001 and follow the chat from oldest to newest across the selected media and links. Caption matching never searches distant messages.</p>
     </section>
 
     <section class="section" id="statsSection" style="display:none;">
@@ -40,8 +40,9 @@
           <dt>Videos</dt>              <dd id="statVideos">-</dd>
           <dt>Audio</dt>               <dd id="statAudio">-</dd>
           <dt>Documents</dt>           <dd id="statDocuments">-</dd>
+          <dt>Links</dt>               <dd id="statLinks">-</dd>
         </dl>
-        <p class="hint">WhatsApp Web keeps about a year of history loaded. Load more to reach further back.</p>
+        <p class="hint">Statistics reflect messages currently loaded in WhatsApp Web. Links are text messages containing a web address or WhatsApp link-preview URL. Load more messages before exporting older items.</p>
         <button type="button" id="loadMoreBtn" class="btn" style="margin-top:8px;">Load more messages</button>
       </div>
     </section>
@@ -59,7 +60,9 @@
         <label class="check"><input type="checkbox" class="t" value="video" checked> Video</label>
         <label class="check"><input type="checkbox" class="t" value="audio" checked> Audio</label>
         <label class="check"><input type="checkbox" class="t" value="document" checked> Documents</label>
+        <label class="check"><input type="checkbox" class="t" value="link" checked> Links</label>
       </div>
+      <p class="hint">Links are taken from the same messages loaded for the selected chat, then filtered by the selected date range. This keeps link exports scoped to the chosen chat/group. A link is exported only when a real URL is found in the selected chat. WhatSave checks message/link-preview fields first and the visible message HTML as a fallback, so clickable viewing links that WhatsApp does not expose in the message object can still be captured.</p>
     </section>
 
     <section class="section">
@@ -74,33 +77,61 @@
           <input id="dateTo" type="date" class="input" max="2100-12-31" />
         </div>
       </div>
-      <p class="hint">Leave empty for all dates.</p>
+      <p class="hint">Leave both fields empty to include all dates. The filter applies to each item’s message timestamp, including links.</p>
     </section>
 
     <section class="section">
       <h2>Options</h2>
       <div class="options" style="margin-top:8px;">
-        <label class="check"><input type="checkbox" id="saveAsZip" checked> Save as single ZIP</label>
-        <label class="check"><input type="checkbox" id="appendOrigNameAll" checked> Append original filename</label>
-        <label class="check"><input type="checkbox" id="useDate"> Add date to filename</label>
+        <label class="check"><input type="checkbox" id="saveAsZip" checked> Save as a single ZIP</label>
+        <label class="check"><input type="checkbox" id="preserveChatOrder" checked> Preserve chat order</label>
+        <p class="option-help">Sorts the complete scanned chat timeline before captions, links, numbering, and saving. Item numbers are assigned in chat order, and individual downloads are saved in that same order.</p>
+        <label class="check"><input type="checkbox" id="appendOrigNameAll" checked> Keep original filename</label>
+        <label class="check"><input type="checkbox" id="useDate"> Add date/time to filename</label>
+
+        <div id="dateFormatGroup" class="sub-option">
+          <div class="field">
+            <label for="dateFormat">Date format</label>
+            <select id="dateFormat" class="select" aria-describedby="dateFormatHelp dateFormatPreview">
+              <option value="YYYY-MM-DD_HH-mm-ss" selected>2026-09-23_15-30-45  —  YYYY-MM-DD_HH-mm-ss</option>
+              <option value="YYYY-MM-DD">2026-09-23  —  YYYY-MM-DD</option>
+              <option value="DD-MM-YYYY_HH-mm-ss">23-09-2026_15-30-45  —  DD-MM-YYYY_HH-mm-ss</option>
+              <option value="DD-MM-YYYY">23-09-2026  —  DD-MM-YYYY</option>
+              <option value="YYYYMMDD_HHmmss">20260923_153045  —  YYYYMMDD_HHmmss</option>
+              <option value="YYYYMMDD">20260923  —  YYYYMMDD</option>
+              <option value="YYMMDD_HHmmss">260923_153045  —  YYMMDD_HHmmss</option>
+            </select>
+            <p class="hint" id="dateFormatHelp">The selected pattern uses each message timestamp. Date format changes only the filename; it never changes chat order. The sequence number stays first (0001_, 0002_, …) so Windows Explorer sorts the exported files naturally.</p>
+            <p class="filename-preview" id="dateFormatPreview">Example: 0001_Chat_2026-09-23_15-30-45.jpg</p>
+          </div>
+        </div>
+
         <label class="check"><input type="checkbox" id="includeSenderName"> Add sender to filename</label>
-        <label class="check"><input type="checkbox" id="useCaptionSuffix"> Add caption to filename</label>
+        <label class="check"><input type="checkbox" id="useCaptionSuffix"> Add caption to media filename</label>
+        <label class="check"><input type="checkbox" id="captureNextMessageCaption" checked> Capture caption from the immediate next message</label>
+        <p class="option-help">Only the single message immediately after the media in the verified chronological chat sequence is considered. It must be plain text, from the same chat and sender, and within 15 seconds. No later message is searched. If adjacency cannot be proven, the media stays without a recovered caption.</p>
+        <label class="check"><input type="checkbox" id="captureReplyCaption" checked> Capture caption from a direct reply</label>
+        <p class="option-help">Only a plain-text reply with an exact WhatsApp reference to this specific media is accepted. Approximate or partial IDs are rejected. A reply that points somewhere else is never used as the caption.</p>
         <label class="check"><input type="checkbox" id="deepScan"> Deep scan (slower, reaches further back)</label>
+        <p class="option-help">Links are detected from the selected chat’s normal message history and exported as one UTF-8 .txt per link message. The first real URL is included in the filename, and every URL found in that message is written inside the .txt. Messages outside the selected chat or date range are ignored.</p>
       </div>
 
       <div class="field" style="margin-top:12px;">
         <label for="concurrency">Parallel downloads</label>
         <select id="concurrency" class="select">
-          <option value="2">2</option>
-          <option value="4" selected>4</option>
-          <option value="6">6</option>
-          <option value="8">8</option>
+          <option value="2">2 files at a time</option>
+          <option value="4" selected>4 files at a time</option>
+          <option value="6">6 files at a time</option>
+          <option value="8">8 files at a time</option>
         </select>
+        <p class="hint">Higher values speed up fetching. With Preserve chat order enabled, media can be fetched in parallel, but the final files are saved oldest → newest. Links are exported as UTF-8 .txt files in the same sequence.</p>
       </div>
+
+      <p class="hint caption-summary"><strong>Captions and links:</strong> the media’s own caption has priority. A direct reply is used only when WhatsApp explicitly points to that exact media. A next-message caption is used only for the literal immediately following text message in verified chat order. Unrelated or uncertain text is never attached. Items selected as <strong>Links</strong> are exported as UTF-8 <strong>.txt</strong> files. WhatSave scans the selected chat’s dedicated URL-message results and also reads link-preview URL fields. The full URL is written inside the file and a safe version of the first URL appears in the filename.</p>
     </section>
 
     <section class="section">
-      <button id="start" class="btn-primary">Download all</button>
+      <button id="start" class="btn-primary">Export selected items</button>
     </section>
 
     <section class="section">
@@ -113,7 +144,7 @@
   </main>
 
   <footer class="footer">
-    <span>Free and open source</span>
+    <span>Open source · Captions stay in media filenames · Viewing links are saved as UTF-8 .txt · Chat order is applied before numbering and saving</span>
     <a href="https://github.com/Jstarzz/WhatSave" target="_blank" rel="noopener">github.com/Jstarzz/WhatSave</a>
   </footer>
 

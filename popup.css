@@ -162,6 +162,30 @@ select[multiple] { padding: var(--s1); }
 
 .options { display: flex; flex-direction: column; }
 
+.sub-option {
+  margin: 2px 0 8px 34px;
+  padding-left: var(--s2);
+  border-left: 1px solid var(--border);
+}
+
+.sub-option .hint { margin-top: var(--s1); }
+
+.option-help {
+  margin: -2px 8px 6px 42px;
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+  color: var(--text-subtle);
+}
+
+.caption-summary {
+  margin-top: var(--s3);
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+
 /* Buttons */
 
 .btn {

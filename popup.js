@@ -11,6 +11,7 @@ const statImages = D('#statImages');
 const statVideos = D('#statVideos');
 const statAudio = D('#statAudio');
 const statDocuments = D('#statDocuments');
+const statLinks = D('#statLinks');
 const loadMoreBtn = D('#loadMoreBtn');
 const closeStatsBtn = D('#closeStatsBtn');
 
@@ -18,10 +19,14 @@ const closeStatsBtn = D('#closeStatsBtn');
 const PREFS_KEY = 'wamd_prefs';
 const prefSelectors = {
   useDate: '#useDate',
+  dateFormat: '#dateFormat',
   includeSenderName: '#includeSenderName',
   captionSuffix: '#useCaptionSuffix',
+  captureNextMessageCaption: '#captureNextMessageCaption',
+  captureReplyCaption: '#captureReplyCaption',
   appendOrigNameAll: '#appendOrigNameAll',
   saveAsZip: '#saveAsZip',
+  preserveChatOrder: '#preserveChatOrder',
   deepScan: '#deepScan',
   concurrency: '#concurrency'
 };
@@ -33,7 +38,12 @@ function loadPrefs() {
       const el = D(selector);
       if (!el || !(key in saved)) continue;
       if (el.type === 'checkbox') el.checked = !!saved[key];
-      else el.value = saved[key];
+      else {
+        const fallback = el.value;
+        el.value = saved[key];
+        // Valor salvo que não existe mais no <select> deixaria o campo vazio.
+        if (el.tagName === 'SELECT' && el.selectedIndex === -1) el.value = fallback;
+      }
     }
   } catch (_) {}
 }
@@ -58,6 +68,41 @@ function bindPrefPersistence() {
 }
 
 bindPrefPersistence();
+
+function formatDateExample(pattern, d = new Date(2026, 8, 23, 15, 30, 45)) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const YYYY = String(d.getFullYear());
+  const YY = YYYY.slice(-2);
+  const MM = pad(d.getMonth() + 1);
+  const DD = pad(d.getDate());
+  const HH = pad(d.getHours());
+  const mm = pad(d.getMinutes());
+  const ss = pad(d.getSeconds());
+  const formats = {
+    'YYYY-MM-DD_HH-mm-ss': `${YYYY}-${MM}-${DD}_${HH}-${mm}-${ss}`,
+    'YYYY-MM-DD': `${YYYY}-${MM}-${DD}`,
+    'DD-MM-YYYY_HH-mm-ss': `${DD}-${MM}-${YYYY}_${HH}-${mm}-${ss}`,
+    'DD-MM-YYYY': `${DD}-${MM}-${YYYY}`,
+    'YYYYMMDD_HHmmss': `${YYYY}${MM}${DD}_${HH}${mm}${ss}`,
+    'YYYYMMDD': `${YYYY}${MM}${DD}`,
+    'YYMMDD_HHmmss': `${YY}${MM}${DD}_${HH}${mm}${ss}`
+  };
+  return formats[pattern] || formats['YYYY-MM-DD_HH-mm-ss'];
+}
+
+function syncDateFormatVisibility() {
+  const enabled = D('#useDate')?.checked === true;
+  const group = D('#dateFormatGroup');
+  const select = D('#dateFormat');
+  const preview = D('#dateFormatPreview');
+  if (group) group.style.display = enabled ? 'block' : 'none';
+  if (select) select.disabled = !enabled;
+  if (preview) preview.textContent = `Example: 0001_Chat_${formatDateExample(select?.value || 'YYYY-MM-DD_HH-mm-ss')}.jpg`;
+}
+
+D('#useDate')?.addEventListener('change', syncDateFormatVisibility);
+D('#dateFormat')?.addEventListener('change', syncDateFormatVisibility);
+syncDateFormatVisibility();
 
 function log(msg) {
   const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
@@ -119,7 +164,7 @@ async function injectFile(tabId, file) {
 }
 
 // Must match APP_VERSION in inpage/app.js.
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.9';
 
 function waitForTabComplete(tabId, timeoutMs = 20000) {
   const deadline = Date.now() + timeoutMs;
@@ -243,7 +288,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     log('Error: ' + data.error);
   } else if (data.type === 'inpage:resp' && data.cmd === 'download') {
     const { count, chats } = data.payload || { count: 0, chats: 0 };
-    log(`Done. Files downloaded: ${count} across ${chats || 1} chat(s).`);
+    log(`Done. Exported ${count} item(s) across ${chats || 1} chat(s).`);
     bar.style.width = '100%';
     setTimeout(() => { progWrap.style.display = 'none'; bar.style.width = '0%'; }, 700);
   }
@@ -275,8 +320,9 @@ function displayStats(stats) {
   statVideos.textContent = stats.videos || 0;
   statAudio.textContent = stats.audio || 0;
   statDocuments.textContent = stats.documents || 0;
+  if (statLinks) statLinks.textContent = stats.links || 0;
 
-  log(`Statistics loaded: ${stats.totalMedia} media files found`);
+  log(`Statistics loaded: ${stats.totalMedia || 0} media + ${stats.links || 0} link item(s) found`);
 }
 
 async function loadChatStats() {
@@ -359,12 +405,13 @@ D('#start').addEventListener('click', async () => {
 
   const types = getTypes();
   if (!types.length) {
-    log('Select at least one media type.');
+    log('Select at least one media type or Links.');
     return;
   }
 
   const naming = {
     useDate: D('#useDate').checked,
+    dateFormat: D('#dateFormat')?.value || 'YYYY-MM-DD_HH-mm-ss',
     includeSenderName: D('#includeSenderName')?.checked ?? false,
     captionSuffix: D('#useCaptionSuffix').checked,
     appendOrigNameAll: D('#appendOrigNameAll')?.checked ?? true
@@ -372,14 +419,17 @@ D('#start').addEventListener('click', async () => {
 
   const pack = {
     saveAsZip: D('#saveAsZip').checked,
+    preserveChatOrder: D('#preserveChatOrder')?.checked !== false,
     deepScan: !!D('#deepScan')?.checked,
-    concurrency: Number(D('#concurrency')?.value) || 4
+    concurrency: Number(D('#concurrency')?.value) || 4,
+    captureNextMessageCaption: D('#captureNextMessageCaption')?.checked !== false,
+    captureReplyCaption: D('#captureReplyCaption')?.checked !== false
   };
 
   const dateFrom = D('#dateFrom').value || '';
   const dateTo = D('#dateTo').value || '';
 
-  log(`Starting download. chats=${chatIds.length}, zip=${pack.saveAsZip}, parallel=${pack.concurrency}, types=[${types.join(',')}]`);
+  log(`Starting export. chats=${chatIds.length}, zip=${pack.saveAsZip}, parallel=${pack.concurrency}, nextCaption=${pack.captureNextMessageCaption}, replyCaption=${pack.captureReplyCaption}, dateFormat=${naming.dateFormat}, types=[${types.join(',')}]`);
   progWrap.style.display = 'block';
   bar.style.width = '4%';
 

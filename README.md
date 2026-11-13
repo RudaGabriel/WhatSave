@@ -24,7 +24,7 @@ Built by [Jstarzz](https://github.com/Jstarzz). A star on the
   is what makes downloading many files back to back possible at all.
 - Media is fetched fresh from WhatsApp instead of read out of whatever the
   page happens to have cached, so files save at their original quality.
-- Downloads run 2, 4, 6, or 8 files at a time rather than strictly one.
+- Media fetching can run 2, 4, 6, or 8 files at a time; **Preserve chat order** controls whether final individual saves are serialized to keep filesystem order.
 - Individual files land in `Downloads/WA Media Downloads/<Chat Name>/...`
   instead of loose in your Downloads root.
 - Progress reporting, a bounded log panel so a large batch does not bog down
@@ -45,6 +45,37 @@ Built by [Jstarzz](https://github.com/Jstarzz). A star on the
 - `background.js` is the MV3 service worker. It is the only place that
   actually calls `chrome.downloads.download()`.
 - `popup.html` / `popup.js` / `popup.css` are the toolbar UI.
+
+
+## Caption recovery
+
+This build keeps caption recovery deliberately strict. A media file can get a caption from only one of these sources:
+
+1. **Inline caption** — text stored directly on the media message.
+2. **Direct reply** — a plain-text message whose WhatsApp reply reference points exactly to that media message.
+3. **Immediate next message** — only the single text message immediately after the media in chronological chat order, from the same chat and sender, within the short proximity window. The extension never searches farther ahead for a convenient text message.
+
+If none of those conditions are met, the media remains without a caption. In particular, an unrelated later message is never used as a fallback.
+
+## Export order and date format
+
+The extension builds one canonical chat timeline **before caption matching, media filtering, numbering, or saving**. Media are then numbered **oldest message -> newest message** from that fixed timeline. When **Preserve chat order** is enabled, individual files are saved sequentially in that same order; parallelism is used only while fetching/decrypting the media. The ZIP entries use the same order.
+
+When **Add date/time to filename** is enabled, **Date format** controls only how that timestamp is written into the filename. The selected format does not change download order.
+
+Available examples include `YYYY-MM-DD_HH-mm-ss`, `DD-MM-YYYY_HH-mm-ss`, `YYYY-MM-DD`, `DD-MM-YYYY`, `YYYYMMDD_HHmmss`, `YYYYMMDD`, and `YYMMDD_HHmmss`.
+
+## Links
+
+Select **Links** under Media type to export chat messages that contain web addresses or WhatsApp link-preview URLs. Each link message becomes one UTF-8 `.txt` file; the first URL is included in the filename and all extracted URLs are written inside the file.
+
+- Links are exported only when the message belongs to a selected chat and falls inside the configured date range. No global URL search is used.
+- WhatSave first reads URL fields from the message model and link preview. If WhatsApp Web exposes the link only in the visible chat DOM, it falls back to the message bubble's clickable anchors/text.
+- A media item whose caption contains a URL stays a media item; it is not duplicated as a link.
+
+## Document captions
+
+For documents/PDFs, a `caption`/`body` value identical to the file name is treated as file metadata, not as a caption. If no valid caption exists, the media remains without one. Same-second media/text pairs use the visible WhatsApp message order (or `sequence`/`rowId`) when available; otherwise they are not guessed.
 
 ## Installing it unpacked
 

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "WhatSave",
-  "description": "Bulk download every image, video, voice note and document from one or more WhatsApp Web chats at once. Free and open source.",
-  "version": "1.2.0",
+  "description": "Bulk export WhatsApp Web media, real captions, direct replies, immediate-next captions, and viewing links in strict chronological chat order.",
+  "version": "1.3.9",
   "icons": {
     "16": "icons/16.png",
     "32": "icons/32.png",
@@ -21,7 +21,9 @@
   ],
   "background": {
     "service_worker": "background.js",
-    "scripts": ["background.js"]
+    "scripts": [
+      "background.js"
+    ]
   },
   "browser_specific_settings": {
     "gecko": {
