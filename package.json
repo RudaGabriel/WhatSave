@@ -1,6 +1,6 @@
 {
   "name": "whatsave",
-  "version": "1.4.3",
+  "version": "1.5.0",
   "description": "Extensão de navegador para exportar em massa mídias, legendas e links do WhatsApp Web, na ordem cronológica da conversa.",
   "private": true,
   "license": "MIT",
@@ -18,8 +18,25 @@
   },
   "scripts": {
     "test": "node testes/verificar-sintaxe.mjs && node testes/executar.mjs",
-    "test:navegador": "node testes/navegador/popup.mjs && node testes/navegador/carregar-mais.mjs",
     "verificar": "node testes/verificar-sintaxe.mjs",
-    "firefox": "node ferramentas/gerar-firefox.mjs"
+    "lint": "eslint .",
+    "cobertura": "c8 --reporter=text-summary --reporter=html --include=inpage/app.js --include=background.js --include=content.js --include=popup.js node testes/executar.mjs",
+    "test:navegador": "node testes/navegador/popup.mjs && node testes/navegador/carregar-mais.mjs",
+    "firefox": "node ferramentas/gerar-firefox.mjs",
+    "firefox:validar": "node ferramentas/gerar-firefox.mjs && web-ext lint --source-dir dist/firefox --self-hosted",
+    "firefox:empacotar": "node ferramentas/gerar-firefox.mjs && web-ext build --source-dir dist/firefox --artifacts-dir dist --overwrite-dest",
+    "atualizar:fflate": "node ferramentas/atualizar-fflate.mjs",
+    "qualidade": "npm run lint && npm test && npm run test:navegador && npm run firefox:validar"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "c8": "12.0.0",
+    "eslint": "9.39.5",
+    "globals": "17.14.0",
+    "playwright": "1.63.0",
+    "web-ext": "10.8.0"
+  },
+  "dependencies": {
+    "fflate": "0.8.3"
   }
 }

@@ -1,5 +1,5 @@
 // WhatSave — testes/zip.test.js
-// Versão 1.4.0 (2026-11-13): gerador de ZIP e formatação de tamanhos.
+// Versão 1.5.0 (2026-11-16): ZIP com o fflate (compressão) e gerador próprio.
 // Autor: Ruda Gabriel.
 // Histórico completo das versões: CHANGELOG.md no repositório.
 'use strict';
@@ -15,12 +15,12 @@ test('CRC32 confere com o valor de referência', () => {
   assert.equal(interno.crc32(bytes('123456789')), 0xCBF43926);
 });
 
-test('gera um ZIP válido com nomes em UTF-8', async () => {
+test('o gerador próprio cria um ZIP válido com nomes em UTF-8', async () => {
   const entradas = [
     { name: '0001_Ação.txt', bytes: bytes('primeiro') },
     { name: '0002_Documento.txt', bytes: bytes('segundo arquivo') }
   ];
-  const blob = interno.makeZip(entradas);
+  const blob = interno.makeZipStore(entradas);
   const zip = new Uint8Array(await blob.arrayBuffer());
   const dv = new DataView(zip.buffer);
 
@@ -60,4 +60,35 @@ test('formata tamanhos em português', () => {
   assert.equal(interno.formatarTamanho(2048), '2 KB');
   assert.equal(interno.formatarTamanho(5.5 * 1024 * 1024), '5,5 MB');
   assert.equal(interno.formatarTamanho(1.25 * 1024 * 1024 * 1024), '1,25 GB');
+});
+
+test('com o fflate, o ZIP comprime textos e apenas armazena mídias', async () => {
+  const { interno: comFflate } = carregarApp({ comFflate: true });
+  const { unzipSync } = require('fflate');
+  const texto = bytes('linha de teste\n'.repeat(500));
+  const imagem = new Uint8Array(2048).map((_, i) => (i * 37) % 251);
+  const ts = Math.floor(new Date(2026, 0, 15, 10, 20, 30).getTime() / 1000);
+  const blob = comFflate.makeZip([
+    { name: '0001_Câmera do Caixa 1.jpg', bytes: imagem, ts },
+    { name: '0002_Endereço.txt', bytes: texto, ts }
+  ]);
+  const zip = new Uint8Array(await blob.arrayBuffer());
+  assert.ok(zip.length < texto.length, 'o texto deveria ter sido comprimido');
+
+  const conteudo = unzipSync(zip);
+  assert.deepEqual(Object.keys(conteudo), ['0001_Câmera do Caixa 1.jpg', '0002_Endereço.txt']);
+  assert.deepEqual(conteudo['0001_Câmera do Caixa 1.jpg'], imagem);
+  assert.deepEqual(conteudo['0002_Endereço.txt'], texto);
+
+  // Método de compressão no cabeçalho local: 0 = armazenado, 8 = DEFLATE.
+  const dv = new DataView(zip.buffer);
+  assert.equal(dv.getUint16(8, true), 0, 'a imagem deveria ser apenas armazenada');
+  assert.equal(dv.getUint16(6, true) & 0x0800, 0x0800, 'marca de nome em UTF-8');
+});
+
+test('sem o fflate, o ZIP usa o gerador próprio automaticamente', async () => {
+  const blob = interno.makeZip([{ name: 'a.txt', bytes: bytes('abc') }]);
+  const zip = new Uint8Array(await blob.arrayBuffer());
+  assert.equal(new DataView(zip.buffer).getUint16(8, true), 0);
+  assert.equal(zip.length, 30 + 5 + 3 + 46 + 5 + 22);
 });

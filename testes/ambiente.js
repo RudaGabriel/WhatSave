@@ -1,5 +1,5 @@
 // WhatSave — testes/ambiente.js
-// Versão 1.4.0 (2026-11-13): carregador do inpage/app.js em ambiente isolado.
+// Versão 1.5.0 (2026-11-16): opção de carregar o fflate antes do app.js.
 // Autor: Ruda Gabriel.
 // Histórico completo das versões: CHANGELOG.md no repositório.
 //
@@ -12,9 +12,11 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const RAIZ = path.resolve(__dirname, '..');
-const CODIGO_APP = fs.readFileSync(path.join(RAIZ, 'inpage', 'app.js'), 'utf8');
+const CAMINHO_APP = path.join(RAIZ, 'inpage', 'app.js');
+const CAMINHO_FFLATE = path.join(RAIZ, 'inpage', 'vendor', 'fflate.js');
+const CODIGO_APP = fs.readFileSync(CAMINHO_APP, 'utf8');
 
-function carregarApp() {
+function carregarApp({ comFflate = false } = {}) {
   const mensagens = [];
   const janela = {
     __WAMD_MODO_TESTE__: true,
@@ -24,6 +26,7 @@ function carregarApp() {
   };
   const contexto = vm.createContext({
     window: janela,
+    self: janela, // No navegador, self === window.
     console,
     setTimeout,
     clearTimeout,
@@ -36,7 +39,12 @@ function carregarApp() {
     DataView,
     ArrayBuffer
   });
-  vm.runInContext(CODIGO_APP, contexto, { filename: 'inpage/app.js' });
+  if (comFflate) {
+    vm.runInContext(fs.readFileSync(CAMINHO_FFLATE, 'utf8'), contexto, { filename: CAMINHO_FFLATE });
+    if (!janela.fflate) throw new Error('O fflate não foi registrado em window.fflate.');
+  }
+  // Caminho absoluto: permite que a cobertura (c8) associe o código ao arquivo.
+  vm.runInContext(CODIGO_APP, contexto, { filename: CAMINHO_APP });
   if (!janela.__WAMD_INTERNO__) throw new Error('As funções internas não foram expostas.');
   return { interno: janela.__WAMD_INTERNO__, mensagens };
 }

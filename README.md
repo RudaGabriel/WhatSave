@@ -1,15 +1,19 @@
 # WhatSave
 
-![Versão](https://img.shields.io/badge/vers%C3%A3o-1.4.3-e8a33d)
-![Testes](https://img.shields.io/badge/testes-60%20aprovados-2ea043)
+![Versão](https://img.shields.io/badge/vers%C3%A3o-1.5.0-e8a33d)
+![Testes](https://img.shields.io/badge/testes-64%20aprovados-2ea043)
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4)
 ![Chrome](https://img.shields.io/badge/Chrome-compat%C3%ADvel-4285F4?logo=googlechrome&logoColor=white)
 ![Edge](https://img.shields.io/badge/Edge-compat%C3%ADvel-0078D7?logo=microsoftedge&logoColor=white)
-![Firefox](https://img.shields.io/badge/Firefox-128%2B-FF7139?logo=firefoxbrowser&logoColor=white)
+![Firefox](https://img.shields.io/badge/Firefox-140%2B-FF7139?logo=firefoxbrowser&logoColor=white)
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES2022-F7DF1E?logo=javascript&logoColor=black)
 ![Node.js](https://img.shields.io/badge/Node.js-18%2B%20(testes)-339933?logo=nodedotjs&logoColor=white)
-![Playwright](https://img.shields.io/badge/Playwright-teste%20de%20navegador-2EAD33?logo=playwright&logoColor=white)
-![wa-js](https://img.shields.io/badge/wa--js-4.4.3-25D366?logo=whatsapp&logoColor=white)
+![wa-js](https://img.shields.io/badge/wa--js-4.8.0-25D366?logo=whatsapp&logoColor=white)
+![fflate](https://img.shields.io/badge/fflate-0.8.3-6E4AFF)
+![ESLint](https://img.shields.io/badge/ESLint-9.39.5-4B32C3?logo=eslint&logoColor=white)
+![Playwright](https://img.shields.io/badge/Playwright-1.63.0-2EAD33?logo=playwright&logoColor=white)
+![c8](https://img.shields.io/badge/c8-12.0.0-F7B93E)
+![web-ext](https://img.shields.io/badge/web--ext-10.8.0-FF7139?logo=firefoxbrowser&logoColor=white)
 ![Licença](https://img.shields.io/badge/licen%C3%A7a-MIT-blue)
 
 Extensão de navegador gratuita e de código aberto que exporta, de uma só vez,
@@ -32,7 +36,7 @@ Tudo acontece no seu próprio computador: nada é enviado para servidores.
 - **Qualidade original:** cada mídia é buscada novamente no WhatsApp, e não copiada de uma prévia em baixa resolução.
 - **Legendas reais:** a legenda pode vir da própria mídia, de uma resposta direta à mídia ou da mensagem imediatamente seguinte — nunca de mensagens sem relação.
 - **Links:** cada mensagem com endereço da internet vira um arquivo `.txt`.
-- **ZIP inteligente:** conversas grandes são divididas automaticamente em partes, sem esgotar a memória.
+- **ZIP inteligente:** textos e documentos são comprimidos, mídias são apenas armazenadas (já são comprimidas), cada arquivo mantém a data da mensagem e conversas grandes são divididas em partes, sem esgotar a memória.
 - **Downloads paralelos:** 2, 4, 6 ou 8 arquivos por vez.
 - **Funciona no computador e no celular** (navegadores que aceitam extensões).
 
@@ -47,7 +51,7 @@ A extensão é instalada no modo de desenvolvedor, a partir desta pasta.
 3. Ative o **Modo do desenvolvedor**.
 4. Clique em **Carregar sem compactação** e selecione a pasta extraída.
 
-**Firefox (128 ou superior)**
+**Firefox (140 ou superior; Android 142 ou superior)**
 
 O `manifest.json` do repositório é o do Chrome. Para o Firefox, gere o pacote
 próprio (requer [Node.js](https://nodejs.org) 18 ou superior):
@@ -140,16 +144,28 @@ continua sendo exportada como mídia.
 
 ## Tecnologias e bibliotecas
 
-| Tecnologia | Uso |
-|---|---|
-| JavaScript (ES2022) | Todo o código da extensão, sem etapa de compilação. |
-| WebExtensions — Manifest V3 | Estrutura da extensão para Chrome, Edge e Firefox. |
-| `chrome.downloads` | Salvamento dos arquivos na pasta Downloads. |
-| `chrome.scripting` | Injeção dos scripts na página do WhatsApp Web. |
-| wa-js 4.4.3 (`inpage/vendor/wppconnect-wa-wrapped.js`) | Leitura das conversas e mensagens já carregadas no WhatsApp Web. Distribuída sem alterações, sob a sua própria licença (Apache-2.0), cujo aviso de direitos autorais deve ser mantido. |
-| Gerador de ZIP próprio | ZIP sem compressão (STORE), com nomes em UTF-8 e CRC32. |
-| Node.js 18+ — `node:test` | Testes automatizados, sem dependências externas. |
-| Playwright (opcional) | Testes em navegador real: popup no computador e no celular, e "Carregar mais mensagens" em página simulada. |
+### Na extensão (vão para o navegador do usuário)
+
+| Tecnologia / biblioteca | Versão | Para que serve | Licença |
+|---|---|---|---|
+| JavaScript (ES2022) | — | Todo o código da extensão, sem etapa de compilação. | — |
+| WebExtensions — Manifest V3 | — | Estrutura da extensão para Chrome, Edge e Firefox. | — |
+| `chrome.downloads` / `chrome.scripting` | — | Salvar os arquivos na pasta Downloads e injetar os scripts na página do WhatsApp Web. | — |
+| [wa-js](https://www.npmjs.com/package/@wppconnect/wa-js) (`inpage/vendor/wppconnect-wa-wrapped.js`) | 4.8.0 | Ler as conversas e mensagens já carregadas no WhatsApp Web e baixar as mídias. Arquivo oficial, sem alterações. | Apache-2.0 |
+| [fflate](https://www.npmjs.com/package/fflate) (`inpage/vendor/fflate.js`) | 0.8.3 | Compactar o ZIP: textos e documentos ficam menores, e mídias são apenas armazenadas. Se não carregar, a extensão usa o gerador de ZIP próprio, sem compressão. | MIT |
+
+### No desenvolvimento (não vão para a extensão)
+
+| Ferramenta | Versão | Para que serve | Comando |
+|---|---|---|---|
+| Node.js — `node:test` | 18+ | Executar os testes automatizados. | `npm test` |
+| [ESLint](https://eslint.org) + `@eslint/js` + `globals` | 9.39.5 / 17.14.0 | Análise estática: aponta erros e código suspeito antes de chegar ao usuário. | `npm run lint` |
+| [Playwright](https://playwright.dev) | 1.63.0 | Testes em navegador real: popup no computador e no celular, e "Carregar mais mensagens" em página simulada. | `npm run test:navegador` |
+| [c8](https://www.npmjs.com/package/c8) | 12.0.0 | Medir quanto do código os testes cobrem (relatório em `coverage/`). | `npm run cobertura` |
+| [web-ext](https://www.npmjs.com/package/web-ext) | 10.8.0 | Ferramenta oficial da Mozilla: valida e empacota a versão do Firefox. | `npm run firefox:validar` / `npm run firefox:empacotar` |
+
+As licenças das bibliotecas de terceiros ficam em `inpage/vendor/` (`LICENSE-wa-js.txt`,
+`wppconnect-wa.js.LICENSE.txt` e `LICENSE-fflate.txt`).
 
 ## Estrutura dos arquivos
 
@@ -160,10 +176,14 @@ continua sendo exportada como mídia.
 | `content.js` | Ponte entre a página do WhatsApp Web e a extensão. |
 | `inpage/app.js` | Lógica principal: lista conversas, lê mensagens, recupera legendas, baixa e salva. |
 | `inpage/vendor/wppconnect-wa-wrapped.js` | Biblioteca wa-js (terceiros, sem alterações). |
+| `inpage/vendor/fflate.js` | Biblioteca fflate (terceiros), gerada por `npm run atualizar:fflate`. |
 | `popup.html`, `popup.js`, `popup.css` | Janela da extensão. |
 | `assets/`, `icons/` | Logotipo e ícones. |
 | `testes/` | Testes automatizados e testes de navegador. |
 | `ferramentas/gerar-firefox.mjs` | Gera o pacote do Firefox em `dist/firefox` (`npm run firefox`). |
+| `ferramentas/atualizar-fflate.mjs` | Copia o fflate instalado pelo npm para `inpage/vendor/fflate.js`. |
+| `eslint.config.mjs` | Regras do ESLint. |
+| `package.json` / `package-lock.json` | Comandos e versões exatas das bibliotecas. |
 | `CHANGELOG.md` | Histórico completo das versões de cada arquivo. |
 | `PRIVACY.md` | Política de privacidade. |
 
@@ -181,27 +201,48 @@ mensagens internas (`popup:cmd`):
 
 ## Desenvolvimento e testes
 
-Requisitos: [Node.js](https://nodejs.org) 18 ou superior. Não há dependências a instalar.
+Requisitos: [Node.js](https://nodejs.org) 18 ou superior.
+
+```bash
+npm install
+```
+
+Instala as ferramentas de desenvolvimento nas versões exatas do `package-lock.json`.
 
 ```bash
 npm test
 ```
 
-Verifica a sintaxe dos scripts e executa os 60 testes automatizados (legendas,
-links, nomes de arquivo, datas, ordem, ZIP, carregamento de mensagens antigas,
-pacote do Firefox e consistência do projeto).
+Verifica a sintaxe dos scripts e executa os 64 testes automatizados (legendas,
+links, nomes de arquivo, datas, ordem, ZIP com e sem compressão, carregamento de
+mensagens antigas, pacote do Firefox e consistência do projeto). Funciona mesmo
+sem `npm install`.
 
 ```bash
-npm install --no-save playwright && npx playwright install chromium
+npm run qualidade
 ```
+
+Executa tudo antes de uma entrega: ESLint, testes automatizados, testes de
+navegador (popup no computador e no celular e "Carregar mais mensagens" em uma
+página que simula o WhatsApp Web) e validação do pacote do Firefox.
+
+Comandos individuais:
+
+| Comando | O que faz |
+|---|---|
+| `npm run lint` | Análise estática com o ESLint. |
+| `npm run test:navegador` | Testes no Chromium com o Playwright. |
+| `npm run cobertura` | Testes com medição de cobertura (relatório em `coverage/index.html`). |
+| `npm run firefox` | Gera o pacote do Firefox em `dist/firefox`. |
+| `npm run firefox:validar` | Gera e valida o pacote do Firefox com o web-ext. |
+| `npm run firefox:empacotar` | Gera o arquivo `.zip` do Firefox em `dist/`. |
+| `npm run atualizar:fflate` | Atualiza `inpage/vendor/fflate.js` a partir do pacote instalado. |
+
+Se o navegador do Playwright ainda não estiver instalado na máquina:
 
 ```bash
-npm run test:navegador
+npx playwright install chromium
 ```
-
-Abre o popup no Chromium, no tamanho de computador e de celular, e confere
-textos, validações e ausência de rolagem horizontal. Também testa
-"Carregar mais mensagens" em uma página que simula o WhatsApp Web.
 
 ## Solução de problemas
 

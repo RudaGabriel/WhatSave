@@ -10,15 +10,15 @@ Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
 
 | Arquivo | Versão | Data |
 |---|---|---|
-| `manifest.json` | 1.4.3 | 2026-11-16 |
-| `package.json` | 1.4.3 | 2026-11-16 |
+| `manifest.json` | 1.5.0 | 2026-11-16 |
+| `package.json` | 1.5.0 | 2026-11-16 |
 | `background.js` | 1.4.0 | 2026-11-13 |
 | `content.js` | 1.4.0 | 2026-11-13 |
 | `popup.html` | 1.4.2 | 2026-11-13 |
-| `popup.js` | 1.4.3 | 2026-11-16 |
+| `popup.js` | 1.5.0 | 2026-11-16 |
 | `popup.css` | 1.4.0 | 2026-11-13 |
-| `inpage/app.js` | 1.4.3 | 2026-11-16 |
-| `testes/ambiente.js` | 1.4.0 | 2026-11-13 |
+| `inpage/app.js` | 1.5.0 | 2026-11-16 |
+| `testes/ambiente.js` | 1.5.0 | 2026-11-16 |
 | `testes/fabrica.js` | 1.4.0 | 2026-11-13 |
 | `testes/executar.mjs` | 1.4.0 | 2026-11-13 |
 | `testes/verificar-sintaxe.mjs` | 1.4.0 | 2026-11-13 |
@@ -27,12 +27,21 @@ Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
 | `testes/links.test.js` | 1.4.0 | 2026-11-13 |
 | `testes/nomes.test.js` | 1.4.0 | 2026-11-13 |
 | `testes/ordem.test.js` | 1.4.0 | 2026-11-13 |
-| `testes/projeto.test.js` | 1.4.3 | 2026-11-16 |
-| `testes/zip.test.js` | 1.4.0 | 2026-11-13 |
-| `testes/navegador/popup.mjs` | 1.4.2 | 2026-11-13 |
+| `testes/projeto.test.js` | 1.5.0 | 2026-11-16 |
+| `testes/zip.test.js` | 1.5.0 | 2026-11-16 |
+| `testes/navegador/popup.mjs` | 1.5.0 | 2026-11-16 |
 | `testes/carregar-mais.test.js` | 1.4.3 | 2026-11-16 |
-| `testes/navegador/carregar-mais.mjs` | 1.4.3 | 2026-11-16 |
-| `ferramentas/gerar-firefox.mjs` | 1.4.3 | 2026-11-16 |
+| `testes/navegador/carregar-mais.mjs` | 1.5.0 | 2026-11-16 |
+| `ferramentas/gerar-firefox.mjs` | 1.5.0 | 2026-11-16 |
+| `ferramentas/atualizar-fflate.mjs` | 1.5.0 | 2026-11-16 |
+| `eslint.config.mjs` | 1.5.0 | 2026-11-16 |
+
+## Extensão 1.5.0 (2026-11-16)
+
+- Biblioteca wa-js atualizada de 4.4.3 para 4.8.0 (arquivo oficial, sem alterações), compatível com o WhatsApp Web atual. Isso elimina os avisos "Module … was not found" e "func is not a function" da versão antiga. Licenças incluídas em `inpage/vendor`.
+- ZIP com compressão pelo fflate 0.8.3: textos e documentos ficam menores, mídias são apenas armazenadas e cada arquivo mantém a data da mensagem.
+- Novas ferramentas de desenvolvimento: ESLint 9 (análise estática), Playwright 1.63 (testes de navegador), c8 12 (cobertura) e web-ext 10 (validação e empacotamento do Firefox).
+- Pacote do Firefox validado pelo web-ext: declara que nenhum dado é coletado; Firefox mínimo 140 (Android 142).
 
 ## Extensão 1.4.3 (2026-11-16)
 
@@ -73,6 +82,7 @@ Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
 
 ### `manifest.json`
 
+- **1.5.0** (2026-11-16): versão 1.5.0; `inpage/vendor/fflate.js` em `web_accessible_resources`; Firefox mínimo 140.
 - **1.4.3** (2026-11-16): versão 1.4.3; `background` somente com `service_worker` (fim do aviso do Chrome).
 - **1.4.2** (2026-11-13): versão 1.4.2.
 - **1.4.1** (2026-11-13): versão 1.4.1.
@@ -82,6 +92,7 @@ Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
 
 ### `package.json`
 
+- **1.5.0** (2026-11-16): versão 1.5.0; bibliotecas com versões exatas (fflate, ESLint, Playwright, c8 e web-ext); comandos `lint`, `cobertura`, `firefox:validar`, `firefox:empacotar`, `atualizar:fflate` e `qualidade`.
 - **1.4.3** (2026-11-16): versão 1.4.3; comando `npm run firefox`; `test:navegador` executa também o teste de carregamento de mensagens.
 - **1.4.2** (2026-11-13): versão 1.4.2.
 - **1.4.1** (2026-11-13): versão 1.4.1.
@@ -107,6 +118,7 @@ Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
 
 ### `popup.js`
 
+- **1.5.0** (2026-11-16): injeta o fflate antes do app.js.
 - **1.4.3** (2026-11-16): "Carregar mais mensagens" aguarda a resposta real da página, informa quantas mensagens vieram e para quando não há mais histórico.
 - **1.4.2** (2026-11-13): mensagens do registro de atividade resumidas; `APP_VERSION` 1.4.2.
 - **1.4.1** (2026-11-13): `APP_VERSION` atualizada para 1.4.1.
@@ -122,6 +134,7 @@ Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
 
 ### `inpage/app.js`
 
+- **1.5.0** (2026-11-16): ZIP com compressão pelo fflate (texto e documentos comprimidos, mídias apenas armazenadas, data da mensagem em cada arquivo), com o gerador próprio (`makeZipStore`) como alternativa automática; ajustes apontados pelo ESLint (variável sem uso, bloco vazio e escapes desnecessários).
 - **1.4.3** (2026-11-16): `loadMoreMessages` reescrito (função interna do WhatsApp, rolagem somente de `#main`, botão do celular reconhecido pelo texto); removidas `findScrollContainer` e `findLoadEarlierButton`.
 - **1.4.2** (2026-11-13): mensagens do registro de atividade resumidas; `APP_VERSION` 1.4.2.
 - **1.4.1** (2026-11-13): `APP_VERSION` atualizada para 1.4.1.
@@ -131,6 +144,7 @@ Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
 
 ### `testes/ambiente.js`
 
+- **1.5.0** (2026-11-16): opção de carregar o fflate; caminho absoluto para a cobertura.
 - **1.4.0** (2026-11-13): criado; carrega o `inpage/app.js` em contexto isolado do Node.
 
 ### `testes/fabrica.js`
@@ -167,15 +181,18 @@ Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
 
 ### `testes/projeto.test.js`
 
+- **1.5.0** (2026-11-16): 2 testes novos (versões exatas das bibliotecas e licenças de terceiros); total de 11.
 - **1.4.3** (2026-11-16): 2 testes novos (manifesto sem `background.scripts` e geração do pacote do Firefox); total de 9.
 - **1.4.0** (2026-11-13): criado; 7 testes de consistência de versões, cabeçalhos, CHANGELOG e README.
 
 ### `testes/zip.test.js`
 
+- **1.5.0** (2026-11-16): 2 testes novos (ZIP com o fflate e alternativa sem compressão); total de 6.
 - **1.4.0** (2026-11-13): criado; 4 testes do gerador de ZIP.
 
 ### `testes/navegador/popup.mjs`
 
+- **1.5.0** (2026-11-16): o Playwright passa a ser instalado com `npm install`.
 - **1.4.2** (2026-11-13): verificação da nova mensagem de período inválido.
 - **1.4.0** (2026-11-13): criado; valida o popup no Chromium, no computador e no celular.
 
@@ -185,8 +202,18 @@ Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
 
 ### `testes/navegador/carregar-mais.mjs`
 
+- **1.5.0** (2026-11-16): o Playwright passa a ser instalado com `npm install`.
 - **1.4.3** (2026-11-16): criado; valida as três estratégias de "Carregar mais mensagens" em uma página que simula o WhatsApp Web.
 
 ### `ferramentas/gerar-firefox.mjs`
 
+- **1.5.0** (2026-11-16): declara `data_collection_permissions` (nenhuma coleta) e Firefox mínimo 140 (Android 142), conforme o web-ext.
 - **1.4.3** (2026-11-16): criado; gera o pacote do Firefox em `dist/firefox`.
+
+### `ferramentas/atualizar-fflate.mjs`
+
+- **1.5.0** (2026-11-16): criado; gera `inpage/vendor/fflate.js` a partir do pacote npm, com invólucro que garante `window.fflate`.
+
+### `eslint.config.mjs`
+
+- **1.5.0** (2026-11-16): criado; regras recomendadas do ESLint para cada ambiente do projeto.

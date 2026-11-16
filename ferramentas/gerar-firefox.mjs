@@ -1,5 +1,5 @@
 // WhatSave — ferramentas/gerar-firefox.mjs
-// Versão 1.4.3 (2026-11-16): gera o pacote do Firefox a partir do manifesto do Chrome.
+// Versão 1.5.0 (2026-11-16): declara data_collection_permissions (nenhuma coleta), exigido pelo Firefox.
 // Autor: Ruda Gabriel.
 // Histórico completo das versões: CHANGELOG.md no repositório.
 //
@@ -32,6 +32,15 @@ if (!servico) {
   process.exit(1);
 }
 manifesto.background = { scripts: [servico] };
+// O Firefox exige a declaração de coleta de dados: o WhatSave não coleta nenhum.
+manifesto.browser_specific_settings = manifesto.browser_specific_settings || {};
+manifesto.browser_specific_settings.gecko = {
+  ...(manifesto.browser_specific_settings.gecko || {}),
+  // data_collection_permissions é reconhecido a partir do Firefox 140 (Android: 142).
+  strict_min_version: '140.0',
+  data_collection_permissions: { required: ['none'] }
+};
+manifesto.browser_specific_settings.gecko_android = { strict_min_version: '142.0' };
 
 rmSync(destino, { recursive: true, force: true });
 mkdirSync(destino, { recursive: true });

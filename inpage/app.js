@@ -1,8 +1,8 @@
 // WhatSave — inpage/app.js
-// Versão 1.4.3 (2026-11-16): "Carregar mais mensagens" reescrito: função interna
-// do WhatsApp, rolagem somente do painel da conversa (#main) e botão de histórico
-// do celular reconhecido pelo texto; o aviso de criptografia nunca é clicado;
-// resultado medido e devolvido ao popup.
+// Versão 1.5.0 (2026-11-16): ZIP com compressão pelo fflate (texto e documentos
+// comuns comprimidos; mídias apenas armazenadas; data da mensagem em cada
+// arquivo), com o gerador próprio como alternativa automática; ajustes
+// apontados pelo ESLint.
 // Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
 // Histórico completo das versões: CHANGELOG.md no repositório.
 //
@@ -14,7 +14,7 @@
   // Atualizada sempre que o formato das mensagens popup <-> página muda. O popup
   // compara este valor com o seu; assim, uma aba aberta antes de uma atualização
   // da extensão não continua usando um app.js antigo com um popup novo.
-  const APP_VERSION = '1.4.3';
+  const APP_VERSION = '1.5.0';
 
   // Evita a injeção dupla do script.
   if (window.__WAMD_APP_LOADED__) {
@@ -90,6 +90,7 @@
     // Caracteres de controle são removidos porque o Windows não os aceita em nomes.
     const clean = String(s || '')
       .normalize('NFC')
+      // eslint-disable-next-line no-control-regex -- remover caracteres de controle é o objetivo.
       .replace(/[\u0000-\u001F\u007F]/g, '')
       .replace(/\s+/gu, ' ')
       .replace(/[\\/:*?"<>|]+/g, '_')
@@ -890,7 +891,7 @@
     return s;
   }
 
-  function isDocumentFilenameMetadata(text, m, kind) {
+  function isDocumentFilenameMetadata(text, m, _kind) {
     if (typeof text !== 'string' || !text.trim()) return false;
     const candidates = mediaFilenameCandidates(m);
     if (!candidates.length) return false;
@@ -963,7 +964,7 @@
   // Um item de link é uma mensagem sem mídia que contém um ou mais endereços.
   // É exportado como arquivo .txt em UTF-8; o primeiro endereço também entra no
   // nome do arquivo, em forma legível e compatível com o Windows.
-  const URL_RE = /https?:\/\/[^\s<>\"'`]+|www\.[^\s<>\"'`]+/gi;
+  const URL_RE = /https?:\/\/[^\s<>"'`]+|www\.[^\s<>"'`]+/gi;
 
   function normalizeLinkCandidate(raw) {
     if (typeof raw !== 'string') return '';
@@ -1748,7 +1749,7 @@
     W.__wamdDownloadPatched = true;
   }
 
-  async function getBlobFromMessageCaches(message, idForLog) {
+  async function getBlobFromMessageCaches(message, _idForLog) {
     const md = message?.mediaData || message?._mediaData || null;
     if (!md) return null;
 
@@ -2021,7 +2022,9 @@
     return concat([u32(0x06054b50), u16(0), u16(0), u16(count), u16(count), u32(cdSize), u32(cdOffset), u16(0)]);
   }
 
-  function makeZip(entries) {
+  // Gerador próprio sem compressão (STORE), usado quando o fflate não está
+  // disponível ou falha.
+  function makeZipStore(entries) {
     const locals = [];
     const centrals = [];
     let offset = 0;
@@ -2041,6 +2044,59 @@
     const eocd = writeEOCD(entries.length, cd.length, offset);
     // Blob em partes: evita copiar todo o conteúdo para um único array.
     return new Blob([...locals, cd, eocd], { type: 'application/zip' });
+  }
+
+  // Formatos que já são comprimidos: recomprimir só gastaria processamento.
+  const EXTENSOES_JA_COMPRIMIDAS = /\.(jpe?g|png|gif|webp|heic|avif|mp4|m4v|mov|webm|3gp|mkv|avi|ogg|opus|oga|mp3|m4a|aac|amr|zip|rar|7z|gz|bz2|xz|pdf|docx|xlsx|pptx|odt|ods|odp|apk|epub)$/i;
+
+  // Data válida para o formato ZIP (DOS: de 1980 a 2107).
+  function dataParaZip(ts) {
+    const n = Number(ts);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    const d = new Date(n * 1000);
+    const ano = d.getFullYear();
+    return (ano >= 1980 && ano <= 2107) ? d : null;
+  }
+
+  // ZIP com o fflate: texto e documentos comuns são comprimidos (DEFLATE);
+  // mídias e formatos já comprimidos são apenas armazenados. A geração é
+  // síncrona e devolve um Blob montado em partes, sem cópia extra dos dados.
+  function makeZipFflate(entries, F) {
+    const partes = [];
+    let erro = null;
+    const zip = new F.Zip((e, dados) => {
+      if (e) erro = e;
+      else if (dados && dados.length) partes.push(dados);
+    });
+    for (const e of entries) {
+      const nome = String(e.name || 'arquivo').normalize('NFC');
+      const dados = e.bytes instanceof Uint8Array ? e.bytes : new Uint8Array(e.bytes);
+      const arquivo = EXTENSOES_JA_COMPRIMIDAS.test(nome)
+        ? new F.ZipPassThrough(nome)
+        : new F.ZipDeflate(nome, { level: 6 });
+      const data = dataParaZip(e.ts);
+      if (data) arquivo.mtime = data;
+      zip.add(arquivo);
+      arquivo.push(dados, true);
+      if (erro) throw erro;
+    }
+    zip.end();
+    if (erro) throw erro;
+    return new Blob(partes, { type: 'application/zip' });
+  }
+
+  // Usa o fflate (inpage/vendor/fflate.js) quando disponível; caso contrário,
+  // ou em caso de falha, recorre ao gerador próprio sem compressão.
+  function makeZip(entries) {
+    const F = window.fflate;
+    if (F && typeof F.Zip === 'function' && typeof F.ZipDeflate === 'function' && typeof F.ZipPassThrough === 'function') {
+      try {
+        return makeZipFflate(entries, F);
+      } catch (e) {
+        log(`Compactação indisponível (${e?.message || e}); usando ZIP sem compressão.`);
+      }
+    }
+    return makeZipStore(entries);
   }
 
   // --- Fila com concorrência limitada ---
@@ -2157,8 +2213,6 @@
     // msgs já chega ordenado. Essa ordem é mantida na numeração dos nomes e,
     // quando solicitado, também nos salvamentos.
     const preserveChatOrder = pack?.preserveChatOrder !== false;
-    if (preserveChatOrder) {
-    }
 
     log(`Baixando ${msgs.length} item(ns)…`);
 
@@ -2172,7 +2226,6 @@
 
     async function prepareEntry(m, i) {
       const index = i + 1;
-      const mid = m?.id?._serialized || m?.id || '';
       const exportKind = safeRead(m, '__wamdExportKind') || (isLinkMessage(m) ? 'link' : 'media');
       const kind = (m.type || m.mediaType || '').toLowerCase();
       const ts = messageTimestamp(m) || Math.floor(Date.now() / 1000);
@@ -2216,7 +2269,7 @@
           ].join('\r\n');
           const bytes = strToUtf8Bytes(text);
           const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-          result = { filename, mime: 'text/plain;charset=utf-8', arrayBuffer, bytes };
+          result = { filename, mime: 'text/plain;charset=utf-8', arrayBuffer, bytes, ts };
         } catch (e) {
           log(`Erro no item ${index}: ${e?.message || e}`);
         }
@@ -2235,7 +2288,7 @@
               chatName, senderName, ts, index, mime,
               caption: m.__wamdCaption || getOwnMediaCaption(m) || '', extHint: '', naming, message: m, kind
             });
-            result = { filename, mime, arrayBuffer, bytes: new Uint8Array(arrayBuffer) };
+            result = { filename, mime, arrayBuffer, bytes: new Uint8Array(arrayBuffer), ts };
           }
         } catch (e) {
           log(`Erro no item ${index}: ${e?.message || e}`);
@@ -2293,7 +2346,7 @@
         if (parte.length && (bytesParte + tamanho > LIMITE_PARTE_ZIP_BYTES || parte.length >= LIMITE_ITENS_ZIP)) {
           await fecharParte(false);
         }
-        parte.push({ name: entry.filename, bytes: entry.bytes });
+        parte.push({ name: entry.filename, bytes: entry.bytes, ts: entry.ts });
         bytesParte += tamanho;
       }, concurrency, log);
       await fecharParte(true);
@@ -2458,7 +2511,7 @@
       getOwnMediaCaption, attachRecoveredCaptions, isPlainTextMessage, isMediaMessage,
       compareMessages, messageTimestamp, messageStanzaId, replyTargetsMedia,
       dayRangeToEpochSeconds, intervaloDatas, withinRange,
-      processarEmOrdem, runPool, makeZip, crc32, formatarTamanho,
+      processarEmOrdem, runPool, makeZip, makeZipStore, crc32, formatarTamanho,
       ehBotaoMensagensAntigas, localizarListaMensagens, loadMoreMessages, medirMensagensCarregadas,
       LIMITE_PONTE_BYTES, LIMITE_PARTE_ZIP_BYTES, LIMITE_ITENS_ZIP, PASTA_DOWNLOADS
     });

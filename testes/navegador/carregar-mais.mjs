@@ -1,5 +1,5 @@
 // WhatSave — testes/navegador/carregar-mais.mjs
-// Versão 1.4.3 (2026-11-16): valida "Carregar mais mensagens" em uma página simulada.
+// Versão 1.5.0 (2026-11-16): o Playwright passa a ser instalado com npm install.
 // Autor: Ruda Gabriel.
 // Histórico completo das versões: CHANGELOG.md no repositório.
 //
@@ -17,7 +17,7 @@ let playwright;
 try {
   playwright = require('playwright');
 } catch {
-  console.error('O Playwright não está instalado. Execute: npm install --no-save playwright && npx playwright install chromium');
+  console.error('O Playwright não está instalado. Execute: npm install && npx playwright install chromium');
   process.exit(1);
 }
 

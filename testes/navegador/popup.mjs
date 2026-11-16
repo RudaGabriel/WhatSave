@@ -1,12 +1,12 @@
 // WhatSave — testes/navegador/popup.mjs
-// Versão 1.4.2 (2026-11-13): verificação da nova mensagem de período inválido.
+// Versão 1.5.0 (2026-11-16): o Playwright passa a ser instalado com npm install.
 // Autor: Ruda Gabriel.
 // Histórico completo das versões: CHANGELOG.md no repositório.
 //
 // Abre o popup.html no Chromium com uma API "chrome" simulada e confere textos,
 // pré-visualização do nome, validação do período, preferências salvas e
 // ausência de rolagem horizontal no celular. Requer o Playwright instalado
-// (npm install --no-save playwright && npx playwright install chromium).
+// (npm install && npx playwright install chromium).
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -17,7 +17,7 @@ let playwright;
 try {
   playwright = require('playwright');
 } catch {
-  console.error('O Playwright não está instalado. Execute: npm install --no-save playwright && npx playwright install chromium');
+  console.error('O Playwright não está instalado. Execute: npm install && npx playwright install chromium');
   process.exit(1);
 }
 
