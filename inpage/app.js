@@ -1,5 +1,8 @@
 // WhatSave — inpage/app.js
-// Versão 1.4.2 (2026-11-13): mensagens do registro de atividade resumidas.
+// Versão 1.4.3 (2026-11-16): "Carregar mais mensagens" reescrito: função interna
+// do WhatsApp, rolagem somente do painel da conversa (#main) e botão de histórico
+// do celular reconhecido pelo texto; o aviso de criptografia nunca é clicado;
+// resultado medido e devolvido ao popup.
 // Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
 // Histórico completo das versões: CHANGELOG.md no repositório.
 //
@@ -11,7 +14,7 @@
   // Atualizada sempre que o formato das mensagens popup <-> página muda. O popup
   // compara este valor com o seu; assim, uma aba aberta antes de uma atualização
   // da extensão não continua usando um app.js antigo com um popup novo.
-  const APP_VERSION = '1.4.2';
+  const APP_VERSION = '1.4.3';
 
   // Evita a injeção dupla do script.
   if (window.__WAMD_APP_LOADED__) {
@@ -409,103 +412,218 @@
     }
   }
 
-  // Localiza o contêiner rolável da lista de mensagens. O wa-js (getMessages) só
-  // lê o armazenamento local do WhatsApp; para alcançar mensagens mais antigas é
-  // preciso fazer a própria lista virtualizada do WhatsApp buscá-las no servidor,
-  // pois não há API pública do wa-js para isso. A busca é estrutural, e não por
-  // nome de classe, porque as classes do WhatsApp Web mudam entre versões.
-  function findScrollContainer() {
-    const candidates = [
-      document.querySelector('[role="application"]'),
-      ...document.querySelectorAll('div')
-    ].filter(Boolean);
+  // --- Carregamento de mensagens antigas ("Carregar mais mensagens") ---------
+  // O wa-js (getMessages) só lê o que já está no armazenamento local. Para trazer
+  // mensagens anteriores, são usadas três estratégias, em ordem, e cada uma é
+  // medida antes e depois:
+  //   1) a função interna do WhatsApp Web que carrega mensagens anteriores;
+  //   2) a rolagem do painel da conversa (#main) até o topo, nunca da lista
+  //      lateral de conversas;
+  //   3) o botão de obter mensagens antigas do celular, reconhecido apenas pelo
+  //      texto (nunca por formato ou posição, para não clicar em avisos como o
+  //      de criptografia).
+  const esperar = (ms) => new Promise(r => setTimeout(r, ms));
 
-    let best = null;
-    for (const el of candidates) {
-      if (el.scrollHeight > el.clientHeight && el.clientHeight > 200) {
-        if (!best || el.scrollHeight > best.scrollHeight) best = el;
+  // Lista de mensagens carregadas na memória para a conversa, com o horário da
+  // mais antiga. Se a estrutura interna não estiver disponível, retorna zeros.
+  function medirMensagensCarregadas(chatId) {
+    try {
+      const chat = window.WPP?.whatsapp?.ChatStore?.get?.(chatId);
+      const colecao = chat?.msgs;
+      let lista = [];
+      if (typeof colecao?.getModelsArray === 'function') lista = colecao.getModelsArray() || [];
+      else if (Array.isArray(colecao?.models)) lista = colecao.models;
+      else if (Array.isArray(colecao?._models)) lista = colecao._models;
+      let maisAntiga = 0;
+      for (const m of lista) {
+        const t = messageTimestamp(m);
+        if (t && (!maisAntiga || t < maisAntiga)) maisAntiga = t;
       }
+      const semMaisAntigas = colecao?.msgLoadState?.noEarlierMsgs === true;
+      return { quantidade: lista.length, maisAntiga, semMaisAntigas };
+    } catch (_) {
+      return { quantidade: 0, maisAntiga: 0, semMaisAntigas: false };
     }
-    return best;
   }
 
-  function findLoadEarlierButton() {
-    const buttons = document.querySelectorAll('button');
-    for (const btn of buttons) {
-      const rect = btn.getBoundingClientRect();
-      const text = (btn.textContent || '').trim();
+  // Módulo interno com loadEarlierMsgs. Só o resultado positivo fica em cache,
+  // para que uma busca feita antes de o WhatsApp terminar de carregar possa ser
+  // repetida depois.
+  let moduloMensagensAntigas = null;
+  function obterModuloMensagensAntigas() {
+    if (moduloMensagensAntigas) return moduloMensagensAntigas;
+    try {
+      const busca = window.WPP?.webpack?.search;
+      if (typeof busca !== 'function') return null;
+      const modulo = busca(m => typeof m?.loadEarlierMsgs === 'function');
+      if (modulo) moduloMensagensAntigas = modulo;
+    } catch (_) {}
+    return moduloMensagensAntigas;
+  }
 
-      // O botão de carregar mensagens anteriores fica perto do topo do painel e tem
-      // um rótulo longo, em forma de frase (traduzido conforme o idioma; por isso a
-      // busca considera o formato e a posição, e não o texto exato).
-      if (rect.top >= 0 && rect.top < 400 && text.length > 35 && text.length < 150) {
-        const lower = text.toLowerCase();
-        const excluded = ['call', 'video', 'menu', 'search', 'emoji', 'attach', 'send'];
-        if (!excluded.some(kw => lower.includes(kw))) return btn;
+  // Estratégia 1: chama a função interna em laço enquanto a contagem crescer
+  // (no máximo 5 chamadas por variante e 15 s no total).
+  async function carregarPorApi(chat, contar) {
+    const variantes = [];
+    const modulo = obterModuloMensagensAntigas();
+    if (modulo) variantes.push(() => modulo.loadEarlierMsgs(chat, chat?.msgs));
+    if (typeof chat?.loadEarlierMsgs === 'function') variantes.push(() => chat.loadEarlierMsgs());
+    if (typeof chat?.msgs?.loadEarlierMsgs === 'function') variantes.push(() => chat.msgs.loadEarlierMsgs());
+    if (!variantes.length) return false;
+
+    const inicio = Date.now();
+    let cresceu = false;
+    for (const chamar of variantes) {
+      for (let i = 0; i < 5 && Date.now() - inicio < 15000; i++) {
+        const antes = contar();
+        let retorno;
+        try {
+          retorno = await withTimeout(Promise.resolve().then(chamar), 8000, 'loadEarlierMsgs');
+        } catch (e) {
+          log(`Carregamento interno indisponível: ${e?.message || e}`);
+          break;
+        }
+        await esperar(300);
+        const recebeuLista = Array.isArray(retorno) && retorno.length > 0;
+        if (contar() > antes || recebeuLista) { cresceu = true; continue; }
+        break;
+      }
+      if (cresceu) return true;
+    }
+    return false;
+  }
+
+  function ehRolavel(el) {
+    try {
+      const estilo = window.getComputedStyle(el);
+      return /(auto|scroll|overlay)/.test(estilo.overflowY) && el.scrollHeight > el.clientHeight + 1;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Painel rolável da conversa aberta: sobe a partir de uma linha de mensagem
+  // ([data-id]) dentro de #main até o primeiro ancestral rolável. Como
+  // alternativa, usa o maior elemento rolável dentro de #main. A lista lateral
+  // de conversas nunca é considerada.
+  function localizarListaMensagens() {
+    const main = document.querySelector('#main');
+    if (!main) return null;
+    const linha = main.querySelector('[data-id]');
+    for (let el = linha?.parentElement; el && el !== main.parentElement; el = el.parentElement) {
+      if (ehRolavel(el)) return el;
+    }
+    let melhor = null;
+    for (const el of main.querySelectorAll('div')) {
+      if (ehRolavel(el) && (!melhor || el.scrollHeight > melhor.scrollHeight)) melhor = el;
+    }
+    return melhor;
+  }
+
+  // Estratégia 2: leva o painel ao topo repetidamente até a altura parar de
+  // crescer (3 tentativas seguidas sem crescimento ou 20 s no total).
+  async function carregarPorRolagem(lista, limiteMs = 20000) {
+    const inicio = Date.now();
+    let alturaAnterior = lista.scrollHeight;
+    let semCrescer = 0;
+    let cresceu = false;
+    while (Date.now() - inicio < limiteMs && semCrescer < 3) {
+      if (!document.contains(lista)) break; // A conversa foi trocada ou fechada.
+      lista.scrollTop = 0;
+      await esperar(1200);
+      const altura = lista.scrollHeight;
+      if (altura > alturaAnterior + 2) {
+        alturaAnterior = altura;
+        cresceu = true;
+        semCrescer = 0;
+      } else {
+        semCrescer++;
       }
     }
+    return cresceu;
+  }
+
+  // Reconhece, em português, inglês e espanhol, o botão que pede ao celular as
+  // mensagens antigas. Recusa avisos de criptografia, chamadas e pesquisa.
+  function ehBotaoMensagensAntigas(texto) {
+    const t = String(texto || '')
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/\s+/g, ' ').trim().toLowerCase();
+    if (!t || t.length > 200) return false;
+    if (/(criptograf|encrypt|cifrad|ligac|llamad|\bcall\b|pesquis|search|buscar)/.test(t)) return false;
+    return /(mensagens|mensajes)\s+(mais\s+|mas\s+)?(antigas|antiguos|anteriores)|(older|earlier|previous)\s+messages/.test(t);
+  }
+
+  function localizarBotaoMensagensAntigas() {
+    const main = document.querySelector('#main');
+    if (!main) return null;
+    for (const el of main.querySelectorAll('button, [role="button"]')) {
+      if (ehBotaoMensagensAntigas(el.textContent)) return el;
+    }
     return null;
+  }
+
+  async function aguardarCrescimento(contar, antes, limiteMs = 10000) {
+    const inicio = Date.now();
+    while (Date.now() - inicio < limiteMs) {
+      await esperar(500);
+      if (contar() > antes) return true;
+    }
+    return false;
   }
 
   async function loadMoreMessages(chatId) {
     await ensureReady();
     try {
+      // A conversa precisa estar aberta para a rolagem e para o botão.
       try {
         await window.WPP.chat.openChatBottom(chatId);
-      } catch (e) {
-        await window.WPP.chat.openChatAt(chatId);
+      } catch (_) {
+        try { await window.WPP.chat.openChatAt(chatId); } catch (_) {}
       }
-      await new Promise(r => setTimeout(r, 500));
+      await esperar(600);
 
-      const scrollContainer = findScrollContainer();
-      if (!scrollContainer) {
-        log('loadMoreMessages(): a lista rolável de mensagens não foi encontrada.');
-        return { ok: false, error: 'Lista rolável de mensagens não encontrada' };
-      }
-
-      // Rola até o topo em etapas, dando tempo ao WhatsApp para carregar o histórico,
-      // em vez de ir diretamente para scrollTop = 0.
-      for (let i = 0; i < 10; i++) {
-        scrollContainer.scrollTop = Math.max(0, scrollContainer.scrollTop - 500);
-        await new Promise(r => setTimeout(r, 200));
-      }
-      scrollContainer.scrollTop = 0;
-
-      // Mantém a lista presa ao topo por alguns instantes, enquanto o WhatsApp carrega.
-      let scrollLocked = true;
-      const lockScroll = () => { if (scrollLocked) scrollContainer.scrollTop = 0; };
-      scrollContainer.addEventListener('scroll', lockScroll);
-      let loadMoreBtn = null;
-      try {
-        await new Promise(r => setTimeout(r, 1500));
-        scrollContainer.scrollTop = 0;
-        await new Promise(r => setTimeout(r, 500));
-        loadMoreBtn = findLoadEarlierButton();
-      } finally {
-        // A trava de rolagem é sempre liberada, mesmo se algo falhar acima.
-        scrollLocked = false;
-        scrollContainer.removeEventListener('scroll', lockScroll);
+      const chat = window.WPP?.whatsapp?.ChatStore?.get?.(chatId) || null;
+      if (!chat && !document.querySelector('#main')) {
+        return { ok: false, error: 'Abra a conversa no WhatsApp Web e tente novamente.' };
       }
 
-      if (!loadMoreBtn) {
-        return { ok: true, clicked: false, message: 'Botão de carregar mensagens anteriores não encontrado (todo o histórico pode já estar carregado).' };
+      const contar = () => medirMensagensCarregadas(chatId).quantidade;
+      const antes = medirMensagensCarregadas(chatId);
+      let metodo = '';
+
+      if (chat && await carregarPorApi(chat, contar)) metodo = 'api';
+
+      if (!metodo) {
+        const lista = localizarListaMensagens();
+        if (lista && await carregarPorRolagem(lista)) metodo = 'rolagem';
       }
 
-      if (!document.contains(loadMoreBtn)) {
-        return { ok: false, error: 'O botão desapareceu antes de ser clicado' };
+      if (!metodo) {
+        const botao = localizarBotaoMensagensAntigas();
+        if (botao && document.contains(botao)) {
+          botao.click();
+          metodo = 'celular';
+          await aguardarCrescimento(contar, contar());
+        }
       }
 
-      try {
-        loadMoreBtn.click();
-      } catch (e) {
-        loadMoreBtn.dispatchEvent(new MouseEvent('click', { view: window, bubbles: true, cancelable: true }));
-      }
-
-      await new Promise(r => setTimeout(r, 3000));
-      return { ok: true, clicked: true };
+      const depois = medirMensagensCarregadas(chatId);
+      const carregadas = Math.max(0, depois.quantidade - antes.quantidade);
+      const recuou = !!(depois.maisAntiga && antes.maisAntiga && depois.maisAntiga < antes.maisAntiga);
+      const fim = depois.semMaisAntigas || (!metodo && carregadas === 0 && !recuou);
+      return {
+        ok: true,
+        carregadas,
+        antes: antes.quantidade,
+        depois: depois.quantidade,
+        maisAntiga: depois.maisAntiga || 0,
+        metodo: metodo || 'nenhum',
+        fim
+      };
     } catch (e) {
       log('loadMoreMessages(): erro: ' + (e?.message || e));
-      return { ok: false, error: e.message };
+      return { ok: false, error: String(e?.message || e) };
     }
   }
 
@@ -2341,6 +2459,7 @@
       compareMessages, messageTimestamp, messageStanzaId, replyTargetsMedia,
       dayRangeToEpochSeconds, intervaloDatas, withinRange,
       processarEmOrdem, runPool, makeZip, crc32, formatarTamanho,
+      ehBotaoMensagensAntigas, localizarListaMensagens, loadMoreMessages, medirMensagensCarregadas,
       LIMITE_PONTE_BYTES, LIMITE_PARTE_ZIP_BYTES, LIMITE_ITENS_ZIP, PASTA_DOWNLOADS
     });
   }

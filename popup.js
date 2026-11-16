@@ -1,5 +1,6 @@
 // WhatSave — popup.js
-// Versão 1.4.2 (2026-11-13): mensagens do registro de atividade resumidas.
+// Versão 1.4.3 (2026-11-16): "Carregar mais mensagens" aguarda a resposta real da
+// página, informa quantas mensagens vieram e para quando não há mais histórico.
 // Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
 // Histórico completo das versões: CHANGELOG.md no repositório.
 //
@@ -184,7 +185,7 @@ async function injectFile(tabId, file) {
 }
 
 // Precisa ser igual a APP_VERSION em inpage/app.js.
-const APP_VERSION = '1.4.2';
+const APP_VERSION = '1.4.3';
 
 function waitForTabComplete(tabId, timeoutMs = 20000) {
   const deadline = Date.now() + timeoutMs;
@@ -280,9 +281,33 @@ async function sendToPage(message) {
   }
 }
 
+// Respostas aguardadas por comando (ex.: loadMore). Cada espera é resolvida pela
+// resposta ou pelo erro daquele comando, ou pelo tempo limite.
+const respostasPendentes = new Map();
+
+function aguardarResposta(cmd, limiteMs = 60000) {
+  return new Promise((resolve) => {
+    const anterior = respostasPendentes.get(cmd);
+    if (anterior) anterior({ ok: false, error: 'substituída por uma nova solicitação' });
+    const timer = setTimeout(() => {
+      respostasPendentes.delete(cmd);
+      resolve({ ok: false, error: 'a página não respondeu a tempo' });
+    }, limiteMs);
+    respostasPendentes.set(cmd, (resposta) => {
+      clearTimeout(timer);
+      respostasPendentes.delete(cmd);
+      resolve(resposta);
+    });
+  });
+}
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!msg || msg.__from !== 'wamd:content') return;
   const data = msg.payload || {};
+
+  const pendente = data.cmd ? respostasPendentes.get(data.cmd) : null;
+  if (pendente && data.type === 'inpage:resp') pendente(data.payload || {});
+  else if (pendente && data.type === 'inpage:error') pendente({ ok: false, error: data.error });
 
   if (data.type === 'wa:log') {
     log(data.message);
@@ -381,14 +406,16 @@ loadMoreBtn?.addEventListener('click', async () => {
   }
   const selectedChatId = ids[0];
 
-  const totalLoads = 5;
-  log(`Carregando histórico (${totalLoads} rodadas)…`);
+  const totalRodadas = 5;
+  log('Carregando mensagens anteriores…');
   loadMoreBtn.disabled = true;
 
   try {
-    for (let i = 1; i <= totalLoads; i++) {
-      loadMoreBtn.textContent = `Carregando ${i}/${totalLoads}…`;
+    let total = 0;
+    for (let i = 1; i <= totalRodadas; i++) {
+      loadMoreBtn.textContent = `Carregando ${i}/${totalRodadas}…`;
 
+      const resposta = aguardarResposta('loadMore');
       const enviado = await sendToPage({
         __from: 'wamd:inpage',
         type: 'popup:cmd',
@@ -397,12 +424,30 @@ loadMoreBtn?.addEventListener('click', async () => {
       });
       if (!enviado) break;
 
-      await new Promise(r => setTimeout(r, 6000));
-      await loadChatStats();
+      const r = await resposta;
+      if (!r || r.ok === false) {
+        log('Erro ao carregar o histórico: ' + (r?.error || 'resposta inválida'));
+        break;
+      }
+
+      const carregadas = Number(r.carregadas) || 0;
+      total += carregadas;
+      const desde = r.maisAntiga ? ` (desde ${new Date(r.maisAntiga * 1000).toLocaleDateString('pt-BR')})` : '';
+      if (carregadas > 0) {
+        log(`Rodada ${i}/${totalRodadas}: ${carregadas} mensagem(ns) carregada(s)${desde}.`);
+      } else if (r.metodo === 'celular') {
+        log('Pedido enviado ao celular. As mensagens antigas podem levar alguns instantes.');
+      } else if (r.metodo === 'rolagem' || r.metodo === 'api') {
+        log(`Rodada ${i}/${totalRodadas}: mensagens anteriores carregadas${desde}.`);
+      }
+
+      if (r.fim || (carregadas === 0 && r.metodo !== 'rolagem' && r.metodo !== 'api')) {
+        if (r.metodo !== 'celular') log('Não há mensagens anteriores disponíveis.');
+        break;
+      }
     }
-    log('Histórico carregado.');
-  } catch (e) {
-    log('Erro ao carregar o histórico: ' + (e?.message || e));
+    if (total > 0) log(`Total: ${total} mensagem(ns) carregada(s).`);
+    await loadChatStats();
   } finally {
     // O botão sempre volta ao estado normal, mesmo se algo falhar.
     loadMoreBtn.disabled = false;
