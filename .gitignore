@@ -20,3 +20,6 @@ node_modules/
 
 # Pacotes gerados (npm run firefox)
 dist/
+
+# Relatório de cobertura (npm run cobertura)
+coverage/

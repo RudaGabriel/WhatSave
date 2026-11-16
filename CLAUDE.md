@@ -51,11 +51,17 @@ manutenção: Ruda Gabriel.
 - **Arquivos do Windows:** se forem criados scripts `.ps1`, `.bat` ou `.vbs`, eles
   ficam 100% ASCII (acentos exibidos na tela escritos como `\uXXXX`) e preservam
   BOM/CRLF onde existirem.
-- **Biblioteca de terceiros:** `inpage/vendor/wppconnect-wa-wrapped.js` nunca é
-  editada.
-- **Antes de entregar:** `npm test` verde e `npm run test:navegador` aprovado
-  (Playwright: popup no computador e no celular). Conferir as capturas geradas em
-  `testes/navegador/` quando a tela mudar.
+- **Bibliotecas de terceiros:** os arquivos em `inpage/vendor` nunca são editados
+  manualmente. A wa-js (`wppconnect-wa-wrapped.js`) só pode ser substituída pelo
+  arquivo `dist/wppconnect-wa.js` de uma versão oficial publicada no npm
+  (`@wppconnect/wa-js`), com as licenças atualizadas; o `fflate.js` é gerado por
+  `npm run atualizar:fflate`. Toda biblioteca usa versão exata no `package.json`
+  e aparece na seção "Tecnologias e bibliotecas" do README.
+- **Antes de entregar:** `npm install` e depois `npm run qualidade` aprovado (ESLint,
+  `npm test`, testes de navegador com Playwright — popup no computador e no
+  celular e "Carregar mais mensagens" — e validação do pacote do Firefox com o
+  web-ext). Conferir as capturas geradas em `testes/navegador/` quando a tela
+  mudar.
 - **Pull requests:** depois de abrir o PR e com os testes verdes, **fazer o merge
   automaticamente** (autorizado pelo dono do repositório) — não esperar aprovação
   manual.

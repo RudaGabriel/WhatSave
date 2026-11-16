@@ -1,6 +1,6 @@
 // WhatSave — popup.js
-// Versão 1.4.3 (2026-11-16): "Carregar mais mensagens" aguarda a resposta real da
-// página, informa quantas mensagens vieram e para quando não há mais histórico.
+// Versão 1.5.0 (2026-11-16): injeta o fflate (inpage/vendor/fflate.js) antes do
+// app.js, para a compactação do ZIP.
 // Autor original: Jstarzz. Edição, análise e manutenção: Ruda Gabriel.
 // Histórico completo das versões: CHANGELOG.md no repositório.
 //
@@ -185,7 +185,7 @@ async function injectFile(tabId, file) {
 }
 
 // Precisa ser igual a APP_VERSION em inpage/app.js.
-const APP_VERSION = '1.4.3';
+const APP_VERSION = '1.5.0';
 
 function waitForTabComplete(tabId, timeoutMs = 20000) {
   const deadline = Date.now() + timeoutMs;
@@ -224,6 +224,12 @@ async function ensureInjected(tabId) {
   const hasWpp = await runInMain(tabId, () => !!window.WPP);
   if (!hasWpp) {
     await injectFile(tabId, 'inpage/vendor/wppconnect-wa-wrapped.js').catch(e => log('Erro ao carregar o wa-js: ' + e.message));
+  }
+
+  // Biblioteca de compactação do ZIP (opcional: sem ela, o ZIP sai sem compressão).
+  const hasFflate = await runInMain(tabId, () => !!(window.fflate && window.fflate.Zip));
+  if (!hasFflate) {
+    await injectFile(tabId, 'inpage/vendor/fflate.js').catch(e => log('Erro ao carregar o fflate: ' + e.message));
   }
 
   const appLoaded = await runInMain(tabId, () => !!window.__WAMD_APP_LOADED__);

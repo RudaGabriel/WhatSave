@@ -1,5 +1,5 @@
 // WhatSave — testes/projeto.test.js
-// Versão 1.4.3 (2026-11-16): manifesto sem background.scripts e pacote do Firefox.
+// Versão 1.5.0 (2026-11-16): bibliotecas fixadas, fflate no manifesto e licenças de terceiros.
 // Autor: Ruda Gabriel.
 // Histórico completo das versões: CHANGELOG.md no repositório.
 //
@@ -25,7 +25,8 @@ const VERSIONADOS = [
   'background.js', 'content.js', 'popup.js', 'popup.html', 'popup.css', 'inpage/app.js',
   ...fs.readdirSync(path.join(RAIZ, 'testes')).filter(n => /\.(js|mjs)$/.test(n)).map(n => `testes/${n}`),
   ...fs.readdirSync(path.join(RAIZ, 'testes', 'navegador')).filter(n => /\.(js|mjs)$/.test(n)).map(n => `testes/navegador/${n}`),
-  ...fs.readdirSync(path.join(RAIZ, 'ferramentas')).filter(n => /\.(js|mjs)$/.test(n)).map(n => `ferramentas/${n}`)
+  ...fs.readdirSync(path.join(RAIZ, 'ferramentas')).filter(n => /\.(js|mjs)$/.test(n)).map(n => `ferramentas/${n}`),
+  'eslint.config.mjs'
 ];
 
 function versaoDoCabecalho(rel) {
@@ -110,4 +111,21 @@ test('o pacote do Firefox é gerado com background.scripts', () => {
   } finally {
     fs.rmSync(destino, { recursive: true, force: true });
   }
+});
+
+test('as bibliotecas têm versões fixas e o fflate está no manifesto', () => {
+  for (const [nome, versao] of Object.entries({ ...pacote.dependencies, ...pacote.devDependencies })) {
+    assert.match(versao, /^\d+\.\d+\.\d+$/, `${nome} deve ter versão exata`);
+  }
+  const recursos = manifesto.web_accessible_resources.flatMap(w => w.resources);
+  assert.ok(recursos.includes('inpage/vendor/fflate.js'));
+  assert.match(ler('popup.js'), /inpage\/vendor\/fflate\.js/);
+});
+
+test('as licenças das bibliotecas de terceiros acompanham os arquivos', () => {
+  for (const rel of ['inpage/vendor/LICENSE-wa-js.txt', 'inpage/vendor/wppconnect-wa.js.LICENSE.txt', 'inpage/vendor/LICENSE-fflate.txt']) {
+    assert.ok(fs.existsSync(path.join(RAIZ, rel)), rel);
+  }
+  assert.match(ler('inpage/vendor/fflate.js').slice(0, 200), /fflate v\d+\.\d+\.\d+ — MIT License/);
+  assert.match(ler('inpage/vendor/wppconnect-wa-wrapped.js').slice(0, 200), /wa-js v\d+\.\d+\.\d+/);
 });

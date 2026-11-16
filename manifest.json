@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "WhatSave",
   "description": "Exporte em massa mídias, legendas reais, respostas diretas e links do WhatsApp Web, na ordem cronológica da conversa.",
-  "version": "1.4.3",
+  "version": "1.5.0",
   "author": "Ruda Gabriel",
   "homepage_url": "https://github.com/RudaGabriel/WhatSave",
   "icons": {
@@ -27,7 +27,7 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "whatsave@rudagabriel.github.io",
-      "strict_min_version": "128.0"
+      "strict_min_version": "140.0"
     }
   },
   "action": {
@@ -49,6 +49,7 @@
     {
       "resources": [
         "inpage/vendor/wppconnect-wa-wrapped.js",
+        "inpage/vendor/fflate.js",
         "inpage/app.js",
         "assets/logo.svg"
       ],
