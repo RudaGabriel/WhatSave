@@ -1,5 +1,5 @@
 // WhatSave — testes/projeto.test.js
-// Versão 1.4.0 (2026-11-13): consistência de versões, cabeçalhos, CHANGELOG e README.
+// Versão 1.4.3 (2026-11-16): manifesto sem background.scripts e pacote do Firefox.
 // Autor: Ruda Gabriel.
 // Histórico completo das versões: CHANGELOG.md no repositório.
 //
@@ -24,7 +24,8 @@ const LINHA_HISTORICO = 'Histórico completo das versões: CHANGELOG.md no repos
 const VERSIONADOS = [
   'background.js', 'content.js', 'popup.js', 'popup.html', 'popup.css', 'inpage/app.js',
   ...fs.readdirSync(path.join(RAIZ, 'testes')).filter(n => /\.(js|mjs)$/.test(n)).map(n => `testes/${n}`),
-  ...fs.readdirSync(path.join(RAIZ, 'testes', 'navegador')).filter(n => /\.(js|mjs)$/.test(n)).map(n => `testes/navegador/${n}`)
+  ...fs.readdirSync(path.join(RAIZ, 'testes', 'navegador')).filter(n => /\.(js|mjs)$/.test(n)).map(n => `testes/navegador/${n}`),
+  ...fs.readdirSync(path.join(RAIZ, 'ferramentas')).filter(n => /\.(js|mjs)$/.test(n)).map(n => `ferramentas/${n}`)
 ];
 
 function versaoDoCabecalho(rel) {
@@ -88,4 +89,25 @@ test('os créditos e o endereço do repositório estão corretos', () => {
   assert.match(ler('LICENSE'), /Ruda Gabriel/);
   assert.match(ler('popup.html'), /github\.com\/RudaGabriel\/WhatSave/);
   assert.equal(manifesto.homepage_url, 'https://github.com/RudaGabriel/WhatSave');
+});
+
+test('o manifesto do Chrome não usa background.scripts', () => {
+  assert.equal(manifesto.background.service_worker, 'background.js');
+  assert.equal(manifesto.background.scripts, undefined);
+});
+
+test('o pacote do Firefox é gerado com background.scripts', () => {
+  const os = require('node:os');
+  const { spawnSync } = require('node:child_process');
+  const destino = fs.mkdtempSync(path.join(os.tmpdir(), 'whatsave-firefox-'));
+  try {
+    const r = spawnSync(process.execPath, [path.join(RAIZ, 'ferramentas', 'gerar-firefox.mjs'), destino], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    const gerado = JSON.parse(fs.readFileSync(path.join(destino, 'manifest.json'), 'utf8'));
+    assert.deepEqual(gerado.background, { scripts: ['background.js'] });
+    assert.equal(gerado.version, VERSAO);
+    assert.ok(fs.existsSync(path.join(destino, 'inpage', 'app.js')));
+  } finally {
+    fs.rmSync(destino, { recursive: true, force: true });
+  }
 });

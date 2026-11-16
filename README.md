@@ -1,7 +1,7 @@
 # WhatSave
 
-![Versão](https://img.shields.io/badge/vers%C3%A3o-1.4.2-e8a33d)
-![Testes](https://img.shields.io/badge/testes-53%20aprovados-2ea043)
+![Versão](https://img.shields.io/badge/vers%C3%A3o-1.4.3-e8a33d)
+![Testes](https://img.shields.io/badge/testes-60%20aprovados-2ea043)
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4)
 ![Chrome](https://img.shields.io/badge/Chrome-compat%C3%ADvel-4285F4?logo=googlechrome&logoColor=white)
 ![Edge](https://img.shields.io/badge/Edge-compat%C3%ADvel-0078D7?logo=microsoftedge&logoColor=white)
@@ -49,8 +49,15 @@ A extensão é instalada no modo de desenvolvedor, a partir desta pasta.
 
 **Firefox (128 ou superior)**
 
+O `manifest.json` do repositório é o do Chrome. Para o Firefox, gere o pacote
+próprio (requer [Node.js](https://nodejs.org) 18 ou superior):
+
+```bash
+npm run firefox
+```
+
 1. Abra `about:debugging#/runtime/this-firefox`.
-2. Clique em **Carregar extensão temporária** e selecione o arquivo `manifest.json`.
+2. Clique em **Carregar extensão temporária** e selecione o arquivo `dist/firefox/manifest.json`.
 
 ## Uso no dia a dia
 
@@ -66,7 +73,10 @@ A extensão é instalada no modo de desenvolvedor, a partir desta pasta.
 7. Acompanhe o andamento em **Atividade**.
 
 Para exportar mensagens antigas de uma conversa, selecione somente ela e use
-**Carregar mais mensagens** antes de exportar.
+**Carregar mais mensagens** antes de exportar. A cada clique, a extensão busca
+mensagens anteriores em até 5 rodadas e informa em **Atividade** quantas vieram
+e a data da mais antiga. Quando o WhatsApp precisa pedir o histórico ao
+celular, a extensão faz o pedido; o celular deve estar conectado à internet.
 
 ### Opções
 
@@ -139,7 +149,7 @@ continua sendo exportada como mídia.
 | wa-js 4.4.3 (`inpage/vendor/wppconnect-wa-wrapped.js`) | Leitura das conversas e mensagens já carregadas no WhatsApp Web. Distribuída sem alterações, sob a sua própria licença (Apache-2.0), cujo aviso de direitos autorais deve ser mantido. |
 | Gerador de ZIP próprio | ZIP sem compressão (STORE), com nomes em UTF-8 e CRC32. |
 | Node.js 18+ — `node:test` | Testes automatizados, sem dependências externas. |
-| Playwright (opcional) | Teste do popup em navegador real, no computador e no celular. |
+| Playwright (opcional) | Testes em navegador real: popup no computador e no celular, e "Carregar mais mensagens" em página simulada. |
 
 ## Estrutura dos arquivos
 
@@ -152,7 +162,8 @@ continua sendo exportada como mídia.
 | `inpage/vendor/wppconnect-wa-wrapped.js` | Biblioteca wa-js (terceiros, sem alterações). |
 | `popup.html`, `popup.js`, `popup.css` | Janela da extensão. |
 | `assets/`, `icons/` | Logotipo e ícones. |
-| `testes/` | Testes automatizados e teste de navegador. |
+| `testes/` | Testes automatizados e testes de navegador. |
+| `ferramentas/gerar-firefox.mjs` | Gera o pacote do Firefox em `dist/firefox` (`npm run firefox`). |
 | `CHANGELOG.md` | Histórico completo das versões de cada arquivo. |
 | `PRIVACY.md` | Política de privacidade. |
 
@@ -176,8 +187,9 @@ Requisitos: [Node.js](https://nodejs.org) 18 ou superior. Não há dependências
 npm test
 ```
 
-Verifica a sintaxe dos scripts e executa os 53 testes automatizados (legendas,
-links, nomes de arquivo, datas, ordem, ZIP e consistência do projeto).
+Verifica a sintaxe dos scripts e executa os 60 testes automatizados (legendas,
+links, nomes de arquivo, datas, ordem, ZIP, carregamento de mensagens antigas,
+pacote do Firefox e consistência do projeto).
 
 ```bash
 npm install --no-save playwright && npx playwright install chromium
@@ -188,7 +200,8 @@ npm run test:navegador
 ```
 
 Abre o popup no Chromium, no tamanho de computador e de celular, e confere
-textos, validações e ausência de rolagem horizontal.
+textos, validações e ausência de rolagem horizontal. Também testa
+"Carregar mais mensagens" em uma página que simula o WhatsApp Web.
 
 ## Solução de problemas
 
@@ -198,6 +211,9 @@ textos, validações e ausência de rolagem horizontal.
 | "Sem comunicação com a página" | Recarregue a aba do WhatsApp Web (F5) e reabra a extensão. |
 | "Versão anterior na aba" | A extensão recarrega o WhatsApp Web automaticamente; aguarde e reabra. |
 | Faltam mídias antigas | Selecione a conversa, use **Carregar mais mensagens** e exporte novamente. Mídias muito antigas podem já ter sido removidas dos servidores do WhatsApp. |
+| "Não há mensagens anteriores disponíveis" | Todo o histórico disponível no WhatsApp Web já foi carregado. Mensagens mais antigas só existem no celular; mantenha-o conectado e tente novamente mais tarde. |
+| "Pedido enviado ao celular" | O WhatsApp está buscando o histórico no celular. Aguarde alguns instantes e clique novamente em **Carregar mais mensagens**. |
+| Aviso "'background.scripts' requires manifest version 2 or lower" no Chrome | Ocorria até a versão 1.4.2. Atualize a extensão (botão **Atualizar** em `chrome://extensions`). |
 | Uma mídia foi "ignorada" | A mídia não está disponível por completo no WhatsApp (por exemplo, expirou). Abra-a no WhatsApp Web e tente novamente. |
 | O navegador pergunta se o site pode baixar vários arquivos | Ocorre com arquivos acima de 40 MB ou com ZIP em várias partes, salvos pela própria página. Clique em **Permitir**. |
 | "Período inválido" | Corrija o período: a data inicial deve ser anterior ou igual à final. |

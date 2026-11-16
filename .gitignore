@@ -17,3 +17,6 @@ testes/navegador/captura-*.png
 
 # Dependências locais (Playwright opcional)
 node_modules/
+
+# Pacotes gerados (npm run firefox)
+dist/
